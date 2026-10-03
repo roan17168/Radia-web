@@ -220,8 +220,10 @@
       if (this.map) this.map.remove();
     }
 
+
+
     /* ======================================================================
-       MAP CONSTRUCTION
+       MAP CONSTRUCTION (Zero-API-Key Compliant)
        ====================================================================== */
 
     _buildMap() {
@@ -239,58 +241,65 @@
         preferCanvas: true
       }).setView(CONFIG.FALLBACK_CENTER, CONFIG.DEFAULT_ZOOM);
 
-      // Primary: CartoDB Dark Matter. Fallback: Stadia Alidade Smooth Dark.
-      const primary = L.tileLayer(
+      // Primary: CartoDB Dark Matter (No API key needed)
+      const primaryTileLayer = L.tileLayer(
         'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
         {
           subdomains: 'abcd',
           maxZoom: CONFIG.MAX_ZOOM,
-          maxNativeZoom: 20,
+          maxNativeZoom: 19,
           detectRetina: true,
           crossOrigin: true,
           keepBuffer: 3
         }
       );
 
+      // Reliable No-Key Fallback: Esri Dark Canvas (if Carto is blocked)
       let fallbackApplied = false;
-      primary.on('tileerror', () => {
+      primaryTileLayer.on('tileerror', () => {
         if (fallbackApplied) return;
         fallbackApplied = true;
-        console.warn('[Radia Proximity] CartoDB tiles unavailable — switching to Stadia.');
-        this.map.removeLayer(primary);
+        console.warn('[Radia Proximity] CartoDB hiccup — falling back to Esri Dark Canvas.');
+        this.map.removeLayer(primaryTileLayer);
+        
         L.tileLayer(
-          'https://tiles.stadiamaps.com/tiles/alidade_smooth_dark/{z}/{x}/{y}{r}.png',
-          { maxZoom: CONFIG.MAX_ZOOM, maxNativeZoom: 20, detectRetina: true, crossOrigin: true }
+          'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+          {
+            maxZoom: CONFIG.MAX_ZOOM,
+            maxNativeZoom: 16,
+            detectRetina: true,
+            crossOrigin: true
+          }
         ).addTo(this.map);
       });
 
-      primary.addTo(this.map);
+      primaryTileLayer.addTo(this.map);
 
-      // Minimal legally-required attribution, rendered as an unobtrusive pill.
+      // Minimal attribution tag
       const attrib = document.createElement('div');
       attrib.className = 'radar-attribution';
-      attrib.textContent = '© OpenStreetMap · CARTO';
+      attrib.textContent = '© OpenStreetMap · CARTO · Esri';
       this.dom.wrapper.appendChild(attrib);
 
-      // Vignette above fog for cinematic depth.
+      // Cinematic Vignette Overlay
       const vignette = document.createElement('div');
       vignette.className = 'radar-vignette';
       this.dom.wrapper.appendChild(vignette);
 
-      // Keep ring scale honest at every zoom level.
+      // Keep 40ft ring geographically scaled at every zoom level
       this.map.on('zoom zoomend move moveend resize', () => {
         this._syncRingScale();
         this._drawFog(true);
       });
 
-      // Dragging breaks follow-lock and surfaces the recenter control.
+      // Break follow-lock on manual user pan
       this.map.on('dragstart', () => {
         this.followMode = false;
         if (this.dom.recenterBtn) this.dom.recenterBtn.classList.add('control-visible');
       });
 
       this.mapReady = true;
-      setTimeout(() => this.map.invalidateSize(), 120);
+      setTimeout(() => this.map.invalidateSize(), 150);
     }
 
     /* ======================================================================
