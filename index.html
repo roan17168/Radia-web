@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#08090C" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <title>Radia — Real World Proximity</title>
+
+  <!-- PWA Manifest Link -->
+  <link rel="manifest" href="./manifest.json" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            radiaBg: '#08090C',
+            radiaCard: '#12151C',
+            radiaBorder: '#1E2330',
+            radiaEmerald: '#10B981',
+            radiaEmeraldDark: '#059669',
+            radiaAmber: '#F59E0B',
+            radiaAmberDark: '#D97706'
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Leaflet Map CSS & JS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <!-- Lucide Icons CDN -->
+  <script src="https://unpkg.com/lucide@latest"></script>
+
+  <!-- PeerJS CDN for WebRTC Real-Time Collisions -->
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+
+  <!-- Application Stylesheets -->
+  <link rel="stylesheet" href="./css/main.css" />
+  <link rel="stylesheet" href="./css/radar.css" />
+  <link rel="stylesheet" href="./css/encounter.css" />
+</head>
+<body class="bg-[#08090C] text-slate-100 flex flex-col justify-between overflow-hidden">
+
+  <!-- MASTER VIEWPORT CONTAINER -->
+  <main id="app-viewport">
+
+    <!-- ====================================================================
+         VIEW 1: AMBIENT RADAR (MAP, FOG-OF-WAR & CLIMB STATS)
+         ==================================================================== -->
+    <section id="view-radar" class="app-view active">
+      
+      <!-- Top Ambient Floating Header -->
+      <header class="absolute top-3 inset-x-3 z-30 flex items-center justify-between pointer-events-none">
+        
+        <!-- User Level & Distance Pill -->
+        <div class="pointer-events-auto glass-panel px-3.5 py-1.5 rounded-full flex items-center gap-2.5 shadow-lg">
+          <div class="relative flex items-center justify-center">
+            <div id="user-aura-indicator" class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></div>
+            <div class="absolute w-5 h-5 rounded-full border border-emerald-500/40 animate-ping"></div>
+          </div>
+          <div class="flex flex-col">
+            <span id="header-user-level" class="text-[10px] font-bold tracking-wider uppercase text-emerald-400">LVL 1 • Wanderer</span>
+            <span id="header-user-distance" class="text-xs font-semibold text-slate-200">0.00 km walked</span>
+          </div>
+        </div>
+
+        <!-- Mode Toggle & Sound Quick Actions -->
+        <div class="pointer-events-auto flex items-center gap-2">
+          <!-- Sound Toggle -->
+          <button id="btn-audio-toggle" class="glass-panel w-9 h-9 rounded-full flex items-center justify-center text-slate-300 hover:text-white" aria-label="Toggle Sound Effects">
+            <i data-lucide="volume-2" class="w-4 h-4"></i>
+          </button>
+
+          <!-- Availability Switch -->
+          <button id="btn-toggle-availability" class="glass-panel px-3 py-1.5 rounded-full flex items-center gap-2 border border-emerald-500/30" aria-label="Toggle Availability Status">
+            <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+            <span id="label-availability" class="text-xs font-semibold text-emerald-300">Open to Talk</span>
+          </button>
+        </div>
+      </header>
+
+      <!-- Map & Fog of War Wrapper -->
+      <div class="relative w-full h-full flex-1">
+        <div id="leaflet-radar-map" class="w-full h-full z-0 bg-[#08090C]"></div>
+
+        <!-- 40-Foot Encounter Radius Ring Overlay -->
+        <div id="proximity-circle-overlay" class="absolute inset-0 pointer-events-none z-10 flex items-center justify-center">
+          <div class="relative flex items-center justify-center">
+            <!-- Outward Glow Fog Ring -->
+            <div class="w-64 h-64 rounded-full border border-emerald-500/20 bg-emerald-500/[0.03] animate-pulse"></div>
+            <div class="absolute w-44 h-44 rounded-full border border-dashed border-emerald-400/40"></div>
+            <!-- Center Avatar Marker -->
+            <div id="radar-avatar-center" class="absolute w-10 h-10 rounded-full border-2 border-emerald-400 bg-slate-900 overflow-hidden shadow-[0_0_15px_rgba(16,185,129,0.5)]">
+              <img id="my-avatar-img" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2310B981'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" alt="My Avatar" class="w-full h-full object-cover" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Simulator & Demo Overlay Bar (For Single Device & Dev Testing) -->
+        <div class="absolute bottom-4 inset-x-4 z-20 flex flex-col gap-2">
+          <div id="hotspot-badge" class="self-center hidden glass-panel px-3 py-1 rounded-full text-[11px] font-semibold text-amber-300 border border-amber-500/30 flex items-center gap-1.5">
+            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-amber-400"></i>
+            <span>University Quad Hotspot (2x Climb XP)</span>
+          </div>
+
+          <div class="glass-panel p-2 rounded-2xl flex items-center justify-between">
+            <div class="flex items-center gap-2 pl-2">
+              <i data-lucide="compass" class="w-4 h-4 text-emerald-400"></i>
+              <span class="text-xs text-slate-300 font-medium">Radius: 40ft (12m)</span>
+            </div>
+            <!-- Test Collision Simulator Button -->
+            <button id="btn-simulate-collision" class="btn-glass px-3 py-1.5 rounded-xl text-xs font-semibold text-emerald-400 hover:border-emerald-500/50 flex items-center gap-1.5">
+              <i data-lucide="radio" class="w-3.5 h-3.5"></i>
+              <span>Simulate Peer Ping</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         VIEW 2: THE REFLECTION JOURNAL (PRIVATE ON-DEVICE STORAGE)
+         ==================================================================== -->
+    <section id="view-reflections" class="app-view">
+      <header class="p-4 border-b border-white/5 flex items-center justify-between">
+        <div>
+          <h1 class="text-lg font-bold text-slate-100">Private Reflection Log</h1>
+          <p class="text-xs text-slate-400">100% Zero-Knowledge on-device storage</p>
+        </div>
+        <button id="btn-export-reflections" class="btn-glass px-3 py-1.5 rounded-xl text-xs font-medium text-slate-300 flex items-center gap-1.5">
+          <i data-lucide="download" class="w-3.5 h-3.5"></i>
+          <span>Export</span>
+        </button>
+      </header>
+
+      <div id="reflections-list" class="flex-1 scroll-container p-4 space-y-3">
+        <!-- Dynamic reflections injected via storage.js -->
+        <div class="glass-panel p-4 rounded-2xl border border-white/5 text-center py-12">
+          <i data-lucide="book-open" class="w-8 h-8 mx-auto mb-2 text-slate-500"></i>
+          <p class="text-sm text-slate-400">No reflections recorded yet.</p>
+          <p class="text-xs text-slate-500 mt-1">Conclude conversations and fill your journal boxes to climb ranks.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         VIEW 3: THE CLIMB (PROGRESSION, XP & MILESTONES)
+         ==================================================================== -->
+    <section id="view-climb" class="app-view">
+      <header class="p-4 border-b border-white/5">
+        <h1 class="text-lg font-bold text-slate-100">The Climb</h1>
+        <p class="text-xs text-slate-400">Real-world movement & conversational mastery</p>
+      </header>
+
+      <div class="flex-1 scroll-container p-4 space-y-4">
+        <!-- Level Progress Card -->
+        <div class="glass-panel p-5 rounded-2xl border border-emerald-500/20 relative overflow-hidden">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <span class="text-xs font-semibold text-emerald-400 tracking-wider uppercase">Current Rank</span>
+              <h2 id="climb-rank-title" class="text-xl font-bold text-white">Urban Scout</h2>
+            </div>
+            <div id="climb-level-badge" class="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center font-bold text-lg text-emerald-400">
+              LVL 2
+            </div>
+          </div>
+
+          <!-- XP Progress Bar -->
+          <div class="w-full bg-slate-800/80 rounded-full h-2.5 overflow-hidden p-0.5">
+            <div id="climb-xp-bar" class="bg-gradient-to-r from-emerald-500 to-amber-400 h-full rounded-full transition-all duration-500" style="width: 45%;"></div>
+          </div>
+          <div class="flex justify-between items-center mt-2 text-[11px] text-slate-400">
+            <span id="climb-current-xp">450 XP</span>
+            <span id="climb-target-xp">1,000 XP to Level 3</span>
+          </div>
+        </div>
+
+        <!-- Climb Stats Grid -->
+        <div class="grid grid-cols-2 gap-3">
+          <div class="glass-panel p-3.5 rounded-2xl">
+            <span class="text-xs text-slate-400">Total Encounters</span>
+            <p id="stats-total-encounters" class="text-xl font-bold text-slate-100 mt-1">12</p>
+          </div>
+          <div class="glass-panel p-3.5 rounded-2xl">
+            <span class="text-xs text-slate-400">Walked Radius</span>
+            <p id="stats-total-distance" class="text-xl font-bold text-slate-100 mt-1">8.4 km</p>
+          </div>
+        </div>
+
+        <!-- Aura Mastery Unlocks (Cosmetics & Visual Ranks Only) -->
+        <div class="glass-panel p-4 rounded-2xl space-y-3">
+          <h3 class="text-xs font-bold uppercase tracking-wider text-slate-300">Avatar Aura Milestones</h3>
+          <div class="space-y-2.5">
+            <div class="flex items-center justify-between p-2 rounded-xl bg-slate-900/40 border border-emerald-500/20">
+              <div class="flex items-center gap-3">
+                <span class="w-3 h-3 rounded-full bg-emerald-400"></span>
+                <div>
+                  <p class="text-xs font-semibold text-slate-200">Emerald Core Ring</p>
+                  <p class="text-[10px] text-slate-400">Unlocked at Level 1</p>
+                </div>
+              </div>
+              <span class="text-[10px] text-emerald-400 font-bold uppercase">Active</span>
+            </div>
+            <div class="flex items-center justify-between p-2 rounded-xl bg-slate-900/20 opacity-60">
+              <div class="flex items-center gap-3">
+                <span class="w-3 h-3 rounded-full bg-amber-400"></span>
+                <div>
+                  <p class="text-xs font-semibold text-slate-300">Solar Flare Aura</p>
+                  <p class="text-[10px] text-slate-500">Unlocks at Level 5</p>
+                </div>
+              </div>
+              <i data-lucide="lock" class="w-3.5 h-3.5 text-slate-500"></i>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         VIEW 4: SETTINGS & IDENTITY PREFERENCES
+         ==================================================================== -->
+    <section id="view-settings" class="app-view">
+      <header class="p-4 border-b border-white/5">
+        <h1 class="text-lg font-bold text-slate-100">Preferences & Profile</h1>
+        <p class="text-xs text-slate-400">Manage real-world encounters and privacy</p>
+      </header>
+
+      <div class="flex-1 scroll-container p-4 space-y-4">
+        <!-- Identity Card -->
+        <div class="glass-panel p-4 rounded-2xl flex items-center gap-3.5">
+          <div class="w-14 h-14 rounded-2xl bg-slate-800 border border-white/10 overflow-hidden relative">
+            <img id="settings-avatar-preview" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2310B981'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" alt="Avatar Preview" class="w-full h-full object-cover" />
+          </div>
+          <div class="flex-1">
+            <label class="text-[10px] font-semibold text-slate-400 uppercase">First Name Only</label>
+            <input id="input-first-name" type="text" value="Alex" class="w-full bg-slate-900/60 border border-white/10 rounded-lg px-2.5 py-1 text-sm text-slate-100 focus:border-emerald-500 focus:outline-none" />
+          </div>
+        </div>
+
+        <!-- Double-Blind Contact Handle -->
+        <div class="glass-panel p-4 rounded-2xl space-y-2">
+          <label class="text-xs font-semibold text-slate-200">Contact Exchange Link (Revealed only on mutual opt-in)</label>
+          <input id="input-contact-handle" type="text" placeholder="e.g. https://wa.me/15551234567 or @telegram" class="w-full bg-slate-900/60 border border-white/10 rounded-xl px-3 py-2 text-xs text-slate-200 focus:border-emerald-500 focus:outline-none" />
+        </div>
+
+        <!-- Conversation Timer Preference -->
+        <div class="glass-panel p-4 rounded-2xl space-y-2">
+          <label class="text-xs font-semibold text-slate-200">Preferred Conversation Limit</label>
+          <p class="text-[11px] text-slate-400">When two people collide, the system locks to whichever person chose the lowest time.</p>
+          <div class="grid grid-cols-3 gap-2 pt-1">
+            <button class="timer-pref-btn btn-glass py-2 rounded-xl text-xs font-semibold text-emerald-400 border-emerald-500/40" data-time="180">3 Min</button>
+            <button class="timer-pref-btn btn-glass py-2 rounded-xl text-xs font-semibold text-slate-400" data-time="300">5 Min</button>
+            <button class="timer-pref-btn btn-glass py-2 rounded-xl text-xs font-semibold text-slate-400" data-time="0">Open</button>
+          </div>
+        </div>
+
+        <!-- Passive Pocket Vibration Toggle -->
+        <div class="glass-panel p-4 rounded-2xl flex items-center justify-between">
+          <div>
+            <p class="text-xs font-semibold text-slate-200">Pocket Proximity Pulse</p>
+            <p class="text-[10px] text-slate-400">Vibrate passively when 40ft radius is crossed</p>
+          </div>
+          <input type="checkbox" id="toggle-pocket-pulse" class="w-4 h-4 accent-emerald-500" checked />
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         MODAL 1: COLLISION IDENTITY PING (MUTUAL 40-FOOT OVERLAY)
+         ==================================================================== -->
+    <div id="modal-collision" class="modal-overlay">
+      <div class="modal-card">
+        <div class="w-12 h-1 bg-slate-700 rounded-full mx-auto mb-4"></div>
+        
+        <div class="text-center space-y-2">
+          <div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold">
+            <i data-lucide="radio" class="w-3.5 h-3.5 animate-pulse"></i>
+            <span>40ft Radius Encounter</span>
+          </div>
+          <h2 class="text-xl font-bold text-white">Someone is in your circle</h2>
+          <p class="text-xs text-slate-400">Look around your immediate physical space to spot this person.</p>
+        </div>
+
+        <!-- Mutual Peer Card -->
+        <div class="my-6 glass-panel p-4 rounded-2xl flex items-center gap-4 border border-emerald-500/20">
+          <div class="w-16 h-16 rounded-2xl bg-slate-800 border-2 border-emerald-400 overflow-hidden shadow-lg">
+            <img id="peer-collision-avatar" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%2394a3b8'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" alt="Peer Face" class="w-full h-full object-cover" />
+          </div>
+          <div>
+            <h3 id="peer-collision-name" class="text-lg font-bold text-slate-100">Jordan</h3>
+            <p id="peer-collision-synced-timer" class="text-xs font-semibold text-amber-400 flex items-center gap-1 mt-0.5">
+              <i data-lucide="timer" class="w-3.5 h-3.5"></i>
+              <span>Synced Limit: 3 Minutes</span>
+            </p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3 mt-auto">
+          <button id="btn-decline-collision" class="btn-glass py-3.5 rounded-xl text-xs font-bold text-slate-400">Walk Away</button>
+          <button id="btn-accept-collision" class="btn-emerald py-3.5 rounded-xl text-xs font-bold">Start Dialogue</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         MODAL 2: LIVE CATALYST CONVERSATION VIEW
+         ==================================================================== -->
+    <div id="modal-catalyst" class="modal-overlay">
+      <div class="modal-card !max-h-[94dvh] h-full justify-between">
+        
+        <!-- Top Session Indicator -->
+        <div class="flex items-center justify-between pb-3 border-b border-white/5">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping"></span>
+            <span class="text-xs font-semibold text-slate-300">Synchronized Conversation</span>
+          </div>
+          <!-- Live Countdown Timer -->
+          <div class="glass-panel px-3 py-1 rounded-full border border-amber-500/30 flex items-center gap-1.5 text-amber-300 text-xs font-bold">
+            <i data-lucide="clock" class="w-3.5 h-3.5"></i>
+            <span id="catalyst-countdown-text">03:00</span>
+          </div>
+        </div>
+
+        <!-- Catalyst Question Card -->
+        <div class="my-auto py-6 text-center space-y-4">
+          <span id="catalyst-category-pill" class="px-3 py-1 rounded-full bg-slate-800 border border-white/10 text-[10px] font-bold tracking-wider uppercase text-emerald-400">
+            Observational Catalyst
+          </span>
+          <h2 id="catalyst-prompt-text" class="text-xl md:text-2xl font-serif font-medium leading-relaxed text-slate-100 px-2">
+            "Look around this immediate space right now. What is one thing here that won't exist in 50 years?"
+          </h2>
+          <p class="text-xs text-slate-400 max-w-xs mx-auto">Both of your screens are displaying this exact same prompt.</p>
+        </div>
+
+        <!-- Conclude CTA -->
+        <div class="pt-4 border-t border-white/5">
+          <button id="btn-conclude-conversation" class="w-full btn-glass py-3.5 rounded-2xl text-xs font-bold text-slate-200 border-white/10 hover:border-amber-500/40 flex items-center justify-center gap-2">
+            <i data-lucide="check-circle-2" class="w-4 h-4 text-emerald-400"></i>
+            <span>Conclude Conversation</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         MODAL 3: POST-ENCOUNTER FLOW (FEEDBACK, DOUBLE-BLIND & JOURNAL)
+         ==================================================================== -->
+    <div id="modal-post-encounter" class="modal-overlay">
+      <div class="modal-card scroll-container space-y-5">
+        <div class="w-12 h-1 bg-slate-700 rounded-full mx-auto"></div>
+
+        <div class="text-center">
+          <h2 class="text-lg font-bold text-white">Conversation Concluded</h2>
+          <p class="text-xs text-slate-400">Wrap up your encounter privately below.</p>
+        </div>
+
+        <!-- 1. 3-Tier Private Safety Signals -->
+        <div class="glass-panel p-4 rounded-2xl space-y-2.5">
+          <label class="text-xs font-semibold text-slate-300">How was the interaction? (100% Private)</label>
+          <div class="grid grid-cols-3 gap-2">
+            <button class="feedback-rating-btn btn-glass py-2.5 rounded-xl text-xs font-medium text-emerald-300 flex flex-col items-center gap-1 hover:border-emerald-500/40" data-rating="1">
+              <i data-lucide="sparkles" class="w-4 h-4"></i>
+              <span>Good Vibe</span>
+            </button>
+            <button class="feedback-rating-btn btn-glass py-2.5 rounded-xl text-xs font-medium text-slate-300 flex flex-col items-center gap-1 hover:border-slate-500/40" data-rating="0">
+              <i data-lucide="handshake" class="w-4 h-4"></i>
+              <span>Neutral</span>
+            </button>
+            <button class="feedback-rating-btn btn-glass py-2.5 rounded-xl text-xs font-medium text-rose-400 flex flex-col items-center gap-1 hover:border-rose-500/40" data-rating="-1">
+              <i data-lucide="alert-triangle" class="w-4 h-4"></i>
+              <span>Unsafe / Off</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- 2. Double-Blind Mutual Connect -->
+        <div class="glass-panel p-4 rounded-2xl space-y-2 border border-emerald-500/20">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs font-bold text-slate-100">Exchange Contact?</p>
+              <p class="text-[10px] text-slate-400">Only shared if Jordan also taps Connect.</p>
+            </div>
+            <button id="btn-toggle-mutual-connect" class="btn-glass px-3.5 py-1.5 rounded-xl text-xs font-bold text-slate-400" data-state="false">
+              Connect
+            </button>
+          </div>
+          <!-- Revealed Contact Container (Hidden until mutual handshake) -->
+          <div id="mutual-contact-reveal-box" class="hidden p-2.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-center space-y-1">
+            <span class="text-[10px] font-bold uppercase text-emerald-400">Mutual Match! Keep in touch:</span>
+            <a id="mutual-contact-link" href="#" target="_blank" class="block text-xs font-mono font-semibold text-white underline"></a>
+          </div>
+        </div>
+
+        <!-- 3. Local Reflection Box -->
+        <div class="glass-panel p-4 rounded-2xl space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-semibold text-slate-200">Reflect in your box (+75 XP)</label>
+            <span class="text-[10px] text-slate-500">Encrypted Locally</span>
+          </div>
+          <textarea id="textarea-reflection-entry" rows="3" placeholder="What surprised you about this person or conversation? Write your reflections..." class="w-full bg-slate-900/70 border border-white/10 rounded-xl p-3 text-xs text-slate-200 focus:border-emerald-500 focus:outline-none"></textarea>
+        </div>
+
+        <!-- Final Submit & Climb Boost -->
+        <button id="btn-save-reflection-finish" class="w-full btn-emerald py-3.5 rounded-2xl text-xs font-bold shadow-lg">
+          Save Reflection & Continue The Climb
+        </button>
+      </div>
+    </div>
+
+    <!-- ====================================================================
+         BOTTOM DOCK NAVIGATION
+         ==================================================================== -->
+    <nav id="bottom-dock">
+      <button class="dock-item active" data-target="view-radar">
+        <i data-lucide="radar" class="w-5 h-5"></i>
+        <span>Radar</span>
+      </button>
+      <button class="dock-item" data-target="view-reflections">
+        <i data-lucide="book-heart" class="w-5 h-5"></i>
+        <span>Journal</span>
+      </button>
+      <button class="dock-item" data-target="view-climb">
+        <i data-lucide="trending-up" class="w-5 h-5"></i>
+        <span>The Climb</span>
+      </button>
+      <button class="dock-item" data-target="view-settings">
+        <i data-lucide="sliders" class="w-5 h-5"></i>
+        <span>Settings</span>
+      </button>
+    </nav>
+
+  </main>
+
+  <!-- Lucide Icon Renderer Trigger -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+    });
+  </script>
+
+ <!-- Core Logic Scripts -->
+  <script src="./js/audio.js"></script>
+  <script src="./js/prompts.js"></script>
+  <script src="./js/storage.js"></script>
+  <script src="./js/gamification.js"></script>
+  <script src="./js/proximity.js"></script>
+  <script src="./js/peer-sync.js"></script>
+  <script src="./js/app.js"></script>
+
+  <!-- Lucide Icon Trigger -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      lucide.createIcons();
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+/* ==========================================================================
+   RADIA — ENCOUNTER, CATALYST, AND PROGRESSION STYLING
+   ========================================================================== */
+
+/* 1. Dynamic Avatar Auras (Progression Ranks) */
+.aura-tier-1 {
+  box-shadow: 0 0 0 2px var(--color-emerald-glow), 0 0 15px rgba(16, 185, 129, 0.4);
+}
+
+.aura-tier-2 {
+  box-shadow: 0 0 0 2px var(--color-amber-glow), 0 0 20px rgba(245, 158, 11, 0.5);
+  animation: aura-pulse-amber 3s infinite alternate ease-in-out;
+}
+
+.aura-tier-3 {
+  box-shadow: 0 0 0 3px #8b5cf6, 0 0 25px rgba(139, 92, 246, 0.6);
+  animation: aura-pulse-violet 2.5s infinite alternate ease-in-out;
+}
+
+.aura-tier-4 {
+  background: linear-gradient(135deg, #10b981, #f59e0b, #8b5cf6);
+  box-shadow: 0 0 0 3px #08090c, 0 0 30px rgba(16, 185, 129, 0.8);
+  animation: aura-rotate-rainbow 4s linear infinite;
+}
+
+@keyframes aura-pulse-amber {
+  0% { box-shadow: 0 0 0 2px var(--color-amber-glow), 0 0 12px rgba(245, 158, 11, 0.3); }
+  100% { box-shadow: 0 0 0 3px var(--color-amber-glow), 0 0 24px rgba(245, 158, 11, 0.7); }
+}
+
+@keyframes aura-pulse-violet {
+  0% { box-shadow: 0 0 0 2px #8b5cf6, 0 0 14px rgba(139, 92, 246, 0.3); }
+  100% { box-shadow: 0 0 0 4px #8b5cf6, 0 0 28px rgba(139, 92, 246, 0.75); }
+}
+
+@keyframes aura-rotate-rainbow {
+  0% { filter: hue-rotate(0deg); }
+  100% { filter: hue-rotate(360deg); }
+}
+
+/* 2. Collision Identity Card Glow & Animation */
+#modal-collision .modal-card {
+  border-top: 1px solid rgba(16, 185, 129, 0.3);
+  box-shadow: 0 -10px 40px -10px rgba(16, 185, 129, 0.25);
+}
+
+.collision-avatar-pulse {
+  position: relative;
+}
+
+.collision-avatar-pulse::after {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 20px;
+  border: 2px solid var(--color-emerald-glow);
+  opacity: 0.6;
+  animation: ping-avatar 2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+
+@keyframes ping-avatar {
+  75%, 100% {
+    transform: scale(1.25);
+    opacity: 0;
+  }
+}
+
+/* 3. Catalyst Conversation View */
+#catalyst-prompt-text {
+  font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
+  line-height: 1.5;
+  letter-spacing: -0.01em;
+  color: #f1f5f9;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.catalyst-timer-ring {
+  transition: stroke-dashoffset 1s linear, stroke 0.4s ease;
+}
+
+.catalyst-timer-warning {
+  stroke: var(--color-amber-glow) !important;
+  animation: timer-pulse 1s infinite alternate;
+}
+
+@keyframes timer-pulse {
+  0% { filter: drop-shadow(0 0 2px rgba(245, 158, 11, 0.4)); }
+  100% { filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.8)); }
+}
+
+/* 4. 3-Tier Post-Encounter Safety Buttons */
+.feedback-rating-btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid var(--border-glass);
+}
+
+.feedback-rating-btn.selected[data-rating="1"] {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: var(--color-emerald-glow);
+  color: #a7f3d0;
+  box-shadow: 0 0 15px -3px rgba(16, 185, 129, 0.4);
+}
+
+.feedback-rating-btn.selected[data-rating="0"] {
+  background: rgba(148, 163, 184, 0.15);
+  border-color: #94a3b8;
+  color: #f8fafc;
+  box-shadow: 0 0 15px -3px rgba(148, 163, 184, 0.3);
+}
+
+.feedback-rating-btn.selected[data-rating="-1"] {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: var(--color-danger);
+  color: #fca5a5;
+  box-shadow: 0 0 15px -3px rgba(239, 68, 68, 0.4);
+}
+
+/* 5. Sub-prompt chips inside journal box */
+.subprompt-chip {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 9999px;
+  font-size: 11px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+
+.subprompt-chip:active {
+  transform: scale(0.95);
+  background: rgba(16, 185, 129, 0.2);
+  color: #a7f3d0;
+}

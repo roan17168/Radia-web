@@ -1,0 +1,250 @@
+/* ==========================================================================
+   RADIA DESIGN SYSTEM TOKENS & CORE STYLING
+   Theme: Deep Slate & Bioluminescent Amber / Emerald
+   ========================================================================== */
+
+:root {
+  /* Slate Core Palette */
+  --color-bg-base: #08090c;
+  --color-surface-1: #12151c;
+  --color-surface-2: #1e2330;
+  --color-surface-3: #282f42;
+
+  /* Bioluminescent Accents */
+  --color-emerald-glow: #10b981;
+  --color-emerald-deep: #059669;
+  --color-amber-glow: #f59e0b;
+  --color-amber-deep: #d97706;
+  --color-danger: #ef4444;
+
+  /* Typography Colors */
+  --text-primary: #f8fafc;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+
+  /* Tactile Glass & Border Tokens */
+  --border-glass: rgba(255, 255, 255, 0.08);
+  --border-active: rgba(16, 185, 129, 0.35);
+  --bg-glass-card: rgba(18, 21, 28, 0.78);
+  --bg-glass-sheet: rgba(8, 9, 12, 0.88);
+
+  /* Elevation Shadows */
+  --shadow-glow-emerald: 0 0 24px -4px rgba(16, 185, 129, 0.35);
+  --shadow-glow-amber: 0 0 24px -4px rgba(245, 158, 11, 0.35);
+  --shadow-tactile: 0 12px 32px -4px rgba(0, 0, 0, 0.65);
+
+  /* Animation Easings */
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.15);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Base Reset & Mobile Viewport Locking */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+html, body {
+  width: 100%;
+  height: 100dvh;
+  min-height: 100%;
+  overflow: hidden;
+  position: fixed;
+  background-color: var(--color-bg-base);
+  color: var(--text-primary);
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Segoe UI", Roboto, sans-serif;
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Master App Root Container */
+#app-viewport {
+  width: 100%;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Glassmorphism Utilities */
+.glass-panel {
+  background: var(--bg-glass-card);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-glass);
+}
+
+.glass-sheet {
+  background: var(--bg-glass-sheet);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid var(--border-glass);
+}
+
+/* View Switcher States */
+.app-view {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(0.98);
+  transition: opacity 0.28s var(--ease-smooth), transform 0.28s var(--ease-smooth);
+  z-index: 10;
+  padding-bottom: calc(76px + env(safe-area-inset-bottom));
+}
+
+.app-view.active {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1);
+  z-index: 20;
+}
+
+/* Tactile Button Reset & Interactive Feedback */
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+  background: none;
+  font-family: inherit;
+  transition: transform 0.12s var(--ease-smooth), filter 0.15s var(--ease-smooth), opacity 0.15s;
+}
+
+button:active {
+  transform: scale(0.96);
+}
+
+/* Tactile Emerald CTA */
+.btn-emerald {
+  background: linear-gradient(135deg, var(--color-emerald-glow) 0%, var(--color-emerald-deep) 100%);
+  color: #ffffff;
+  font-weight: 600;
+  box-shadow: var(--shadow-glow-emerald);
+}
+
+.btn-emerald:active {
+  filter: brightness(0.9);
+}
+
+/* Tactile Amber CTA */
+.btn-amber {
+  background: linear-gradient(135deg, var(--color-amber-glow) 0%, var(--color-amber-deep) 100%);
+  color: #08090c;
+  font-weight: 700;
+  box-shadow: var(--shadow-glow-amber);
+}
+
+/* Subtle Glass Button */
+.btn-glass {
+  background: var(--color-surface-2);
+  color: var(--text-primary);
+  border: 1px solid var(--border-glass);
+}
+
+.btn-glass:active {
+  background: var(--color-surface-3);
+}
+
+/* Bottom Navigation Dock */
+#bottom-dock {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(64px + env(safe-area-inset-bottom));
+  padding-bottom: env(safe-area-inset-bottom);
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  background: rgba(14, 17, 24, 0.88);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border-glass);
+}
+
+.dock-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 100%;
+  color: var(--text-muted);
+  transition: color 0.2s var(--ease-smooth);
+}
+
+.dock-item.active {
+  color: var(--color-emerald-glow);
+}
+
+.dock-item span {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+/* Modal Overlay Base */
+.modal-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: rgba(4, 5, 8, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s var(--ease-smooth);
+}
+
+.modal-overlay.active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.modal-card {
+  background: var(--color-surface-1);
+  border: 1px solid var(--border-glass);
+  border-top-left-radius: 28px;
+  border-top-right-radius: 28px;
+  padding: 24px;
+  box-shadow: var(--shadow-tactile);
+  transform: translateY(100%);
+  transition: transform 0.35s var(--ease-spring);
+  max-height: 88dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+.modal-overlay.active .modal-card {
+  transform: translateY(0);
+}
+
+/* Custom Scrollbar for Inner Content */
+.scroll-container {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-surface-3) transparent;
+}
+
+.scroll-container::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scroll-container::-webkit-scrollbar-thumb {
+  background: var(--color-surface-3);
+  border-radius: 4px;
+}
