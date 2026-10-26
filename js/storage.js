@@ -227,6 +227,9 @@
      */
     async ensureStarterInsights() {
       try {
+        // Invented encounters are demo content. A real vault starts empty so the
+        // insight graph reflects only conversations the user actually had.
+        if (!(window.RadiaConfig && window.RadiaConfig.get('demoMode'))) return;
         if (localStorage.getItem(KEYS.SEEDED_STARTER) === 'true') return;
         const existing = await this._countReflections();
         if (existing > 0) {

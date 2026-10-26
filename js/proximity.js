@@ -32,51 +32,79 @@
   const EARTH_RADIUS_M = 6371008.8;
   const M_PER_FOOT = 0.3048;
 
-  /** Free Global World Map Tile Repositories */
+  /* ==========================================================================
+     MAP TILE SOURCES
+     --------------------------------------------------------------------------
+     Every provider here is KEYLESS and verified to return real imagery.
+     (CartoDB basemaps are intentionally NOT used: their raster endpoints now
+     answer HTTP 200 with an "API KEY REQUIRED" watermark tile, which paints a
+     blank grey field. That was the cause of the "map doesn't work" bug.)
+
+     Provider keys are kept stable (voyager/osm/positron/topo/dark) because they
+     are persisted in localStorage and referenced by the UI.
+
+     If a MapTiler key is present in RadiaConfig, its matching vector-raster
+     style is used instead — same keys, no other code changes.
+     ========================================================================== */
   const TILE_PROVIDERS = {
     voyager: {
       id: 'voyager',
-      name: 'Voyager Street',
-      shortLabel: 'Street & Park',
-      url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
-      subdomains: 'abcd',
+      name: 'Daylight Street',
+      shortLabel: 'Daylight',
+      url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+      maptiler: 'https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.jpg?key={key}',
+      subdomains: [],
       maxNativeZoom: 19,
+      attribution: 'Tiles © Esri',
+      tileClass: 'radia-tiles-soft',
       isDark: false
     },
     osm: {
       id: 'osm',
       name: 'OpenStreetMap',
-      shortLabel: 'OSM Standard',
+      shortLabel: 'Vivid',
       url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      maptiler: 'https://api.maptiler.com/maps/streets-v2/{z}/{x}/{y}.jpg?key={key}',
       subdomains: ['a', 'b', 'c'],
       maxNativeZoom: 19,
+      attribution: '© OpenStreetMap contributors',
+      tileClass: 'radia-tiles-vivid',
       isDark: false
     },
     positron: {
       id: 'positron',
-      name: 'Carto Positron',
-      shortLabel: 'Minimal Light',
-      url: 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png',
-      subdomains: 'abcd',
+      name: 'Morning Gray',
+      shortLabel: 'Calm',
+      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      maptiler: 'https://api.maptiler.com/maps/basic-v2/{z}/{x}/{y}.jpg?key={key}',
+      subdomains: ['a', 'b', 'c'],
       maxNativeZoom: 19,
+      attribution: '© OpenStreetMap contributors',
+      tileClass: 'radia-tiles-gray',
       isDark: false
     },
     topo: {
       id: 'topo',
-      name: 'Esri World Topo',
-      shortLabel: 'Topographic',
+      name: 'Terrain',
+      shortLabel: 'Terrain',
       url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}',
+      maptiler: 'https://api.maptiler.com/maps/topo-v2/{z}/{x}/{y}.jpg?key={key}',
       subdomains: [],
       maxNativeZoom: 18,
+      attribution: 'Tiles © Esri',
+      tileClass: 'radia-tiles-terrain',
       isDark: false
     },
     dark: {
       id: 'dark',
-      name: 'Carto Dark Matter',
-      shortLabel: 'Evening Dark',
-      url: 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}.png',
-      subdomains: 'abcd',
+      name: 'Evening',
+      shortLabel: 'Evening',
+      url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+      maptiler: 'https://api.maptiler.com/maps/basic-v2-dark/{z}/{x}/{y}.jpg?key={key}',
+      subdomains: ['a', 'b', 'c'],
       maxNativeZoom: 19,
+      attribution: '© OpenStreetMap contributors',
+      tileClass: 'radia-tiles-dark',
       isDark: true
     }
   };
@@ -249,6 +277,8 @@
       this.mapReady = false;
       this.mode = 'gps'; // 'gps' | 'simulate'
       this.isAvailable = true;
+      // Demo world (invented neighbours, hubs, insights) is opt-in only.
+      this.demoMode = !!(window.RadiaConfig && window.RadiaConfig.get('demoMode'));
       this.watchId = null;
       this.followMode = true;
 
@@ -270,13 +300,19 @@
       // Immediate Position Initialization
       const cachedPos = this._readJSON(CONFIG.KEY_LAST_POSITION, null);
       const preset = CITY_PRESETS[this.currentCityKey] || CITY_PRESETS.nyc;
+      // Only a genuine GPS fix may be restored. A cached sample location used to
+      // come back as if it were the user's position, which is exactly how you end
+      // up "spawning" in New York while standing in London.
+      const cachedIsReal = !!(cachedPos && cachedPos.real === true && typeof cachedPos.lat === 'number');
       this.position = {
-        lat: cachedPos && typeof cachedPos.lat === 'number' ? cachedPos.lat : preset.lat,
-        lng: cachedPos && typeof cachedPos.lng === 'number' ? cachedPos.lng : preset.lng,
+        lat: cachedIsReal ? cachedPos.lat : preset.lat,
+        lng: cachedIsReal ? cachedPos.lng : preset.lng,
         accuracy: 8,
         timestamp: Date.now(),
-        simulated: true
+        simulated: !cachedIsReal
       };
+      this.hasRealFix = cachedIsReal;
+      this.gpsError = null;
       this.lastAccruedPosition = { ...this.position };
       this.heading = 45;
       this.isWalking = false;
@@ -301,6 +337,9 @@
       // Native Leaflet Layers
       this.userPuckMarker = null;
       this.sprawlOuterCircle = null;
+      this.cosmeticTrail = null;
+      this.cosmeticRadius = null;
+      this.radiusClassName = '';
       this.sprawlInnerCircle = null;
       this.walkingPolyline = null;
       this.walkTargetLine = null;
@@ -345,6 +384,31 @@
       return TILE_PROVIDERS[this.mapTheme] || TILE_PROVIDERS.voyager;
     }
 
+    /**
+     * The bubble breathes with the crowd.
+     *
+     * The calibrated zone sets the floor (a dense core stays tight, an open
+     * trail stays generous). When people are actually present, the bubble
+     * expands just enough to contain the farthest opted-in neighbour, capped
+     * at 3x the calibrated radius so proximity still means something.
+     *
+     * With no one nearby — the normal state of a young network — this returns
+     * exactly the calibrated radius. Population drives size, not decoration.
+     */
+    _effectiveRadiusM() {
+      const base = this.currentSprawl.meters;
+      if (!this.peers || this.peers.size === 0 || !this.position) return base;
+
+      let farthest = 0;
+      this.peers.forEach((peer) => {
+        if (!peer || typeof peer.lat !== 'number') return;
+        const d = Geo.haversine(this.position.lat, this.position.lng, peer.lat, peer.lng);
+        if (d > farthest) farthest = d;
+      });
+
+      return Math.min(base * 3, Math.max(base, farthest + 4));
+    }
+
     init() {
       this.dom.mapEl = document.getElementById('leaflet-radar-map');
       this.dom.stage = document.getElementById('radar-world-stage') || (this.dom.mapEl && this.dom.mapEl.parentElement);
@@ -356,11 +420,15 @@
       this.dom.headerDistance = document.getElementById('header-user-distance');
 
       this._buildFallbackBasemapCanvas();
-      this._seedWorldEnvironment(this.position.lat, this.position.lng);
       this._buildMap();
       this._buildNativeLeafletUserLayers();
-      this._renderLandmarkMarkers();
+      if (this.demoMode) {
+        this._seedWorldEnvironment(this.position.lat, this.position.lng);      this._renderLandmarkMarkers();
       this._seedRoamingExplorers();
+      }
+      window.addEventListener('RADIA_PRESENCE_PEERS', (event) => {
+        this._ingestPresencePeers(event && event.detail ? event.detail.peers : []);
+      });
       this._bindExternalButtons();
       this._setupResizeObserver();
 
@@ -372,6 +440,7 @@
 
       this._evaluateHotspots();
       this._emitDistance(0);
+      this._updatePaceAndCoordsHUD(false);
       this.startGPS();
       this._startRoamingExplorersLoop();
 
@@ -538,7 +607,7 @@
           contactHandle: '@jordan.radia',
           color: '#0d9488',
           bearing: 68,
-          distM: 28,
+          distM: 95,
           walkHeading: 155
         },
         {
@@ -550,7 +619,7 @@
           contactHandle: '@mina.radia',
           color: '#0284c7',
           bearing: 160,
-          distM: 38,
+          distM: 165,
           walkHeading: 250
         },
         {
@@ -562,7 +631,7 @@
           contactHandle: '@theo.radia',
           color: '#d97706',
           bearing: 252,
-          distM: 34,
+          distM: 235,
           walkHeading: 40
         },
         {
@@ -574,7 +643,7 @@
           contactHandle: '@sasha.radia',
           color: '#7c3aed',
           bearing: 335,
-          distM: 42,
+          distM: 310,
           walkHeading: 120
         }
       ];
@@ -670,13 +739,23 @@
         maxNativeZoom: provider.maxNativeZoom || 19,
         detectRetina: false,
         updateWhenIdle: false,
-        keepBuffer: 4
+        keepBuffer: 4,
+        crossOrigin: false
       };
       if (provider.subdomains && provider.subdomains.length) {
         opts.subdomains = provider.subdomains;
       }
+      if (provider.tileClass) {
+        opts.className = provider.tileClass;
+      }
 
-      const layer = L.tileLayer(provider.url, opts);
+      // MapTiler is used only when the user supplies their own key.
+      const hasKey = window.RadiaConfig && window.RadiaConfig.hasMapKey();
+      const tileUrl = hasKey && provider.maptiler
+        ? provider.maptiler.replace('{key}', encodeURIComponent(window.RadiaConfig.get('maptilerKey')))
+        : provider.url;
+
+      const layer = L.tileLayer(tileUrl, opts);
 
       layer.on('tileload', () => {
         this.tilesLoadedCount++;
@@ -689,22 +768,25 @@
         this._updateTileStatusUI('live', provider);
       });
 
+      // No silent failover: a dead CDN must be reported, not papered over with
+      // another provider the user did not choose.
       layer.on('tileerror', () => {
         this.tileErrorCount++;
-        // If primary tile server fails repeatedly before loading tiles, auto-failover
-        if (this.tilesLoadedCount === 0 && this.tileErrorCount >= 4) {
-          const fallbackOrder = ['osm', 'voyager', 'positron', 'topo'];
-          const nextKey = fallbackOrder.find((k) => k !== providerKey);
-          if (nextKey && this.mapTheme === providerKey) {
-            this.mapTheme = nextKey;
-            this._applyTileProvider(nextKey);
-          }
+        if (this.tilesLoadedCount === 0 && this.tileErrorCount === 6) {
+          this._updateTileStatusUI('error', provider);
         }
       });
 
       layer.addTo(this.map);
       this.tileLayer = layer;
       this._drawFallbackBasemap();
+      this._markActiveProvider();
+    }
+
+    _markActiveProvider() {
+      document.querySelectorAll('.map-provider-btn').forEach((btn) => {
+        btn.classList.toggle('is-active', btn.getAttribute('data-provider') === this.mapTheme);
+      });
     }
 
     _updateTileStatusUI(state, provider) {
@@ -712,9 +794,14 @@
       const p = provider || this.currentProvider;
       if (pill) {
         if (state === 'live') {
-          pill.innerHTML = `<span class="w-2 h-2 rounded-full bg-teal-500"></span><span>${p.shortLabel} • Live Map</span>`;
+          pill.innerHTML = `<span class="w-2 h-2 rounded-full bg-teal-500"></span><span>${p.shortLabel}</span>`;
+          pill.dataset.state = 'live';
+        } else if (state === 'error') {
+          pill.innerHTML = `<span class="w-2 h-2 rounded-full bg-rose-500"></span><span>Map tiles unavailable</span>`;
+          pill.dataset.state = 'error';
         } else {
           pill.innerHTML = `<span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span><span>Loading ${p.shortLabel}...</span>`;
+          pill.dataset.state = 'loading';
         }
       }
       this._updateMapLayersDisplayLabel();
@@ -732,10 +819,33 @@
       };
       const cityShort = cityShortMap[this.currentCityKey] || 'NYC';
       const p = this.currentProvider;
-      labelEl.textContent = `${cityShort} • ${p.shortLabel}`;
+      labelEl.textContent = `${cityShort} · ${p.shortLabel}`;
+      const attr = document.getElementById('map-attribution-text');
+      if (attr) attr.textContent = p.attribution || '';
     }
 
-    _getNeighborAvatarSVG(name, accentColor = '#0d9488') {
+    /**
+     * People have no photo in a fresh network, so a person is an initial on a
+     * disc — never an invented cartoon face.
+     */
+    _getNeighborAvatarSVG(name, accentColor = '#0b4f3f') {
+      const initials = String(name || '?')
+        .replace(/[^\p{L}\s'-]/gu, '')
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((word) => (word ? word[0].toUpperCase() : ''))
+        .join('') || '?';
+
+      return `<svg viewBox="0 0 48 48" class="w-full h-full" aria-hidden="true">
+        <circle cx="24" cy="24" r="24" fill="${accentColor}" />
+        <text x="24" y="25" text-anchor="middle" dominant-baseline="central"
+          font-family="Instrument Sans, sans-serif" font-size="17" font-weight="600"
+          fill="#FCFBF7">${initials}</text>
+      </svg>`;
+    }
+
+    _legacyNeighborAvatarSVG(name, accentColor = '#0d9488') {
       const key = String(name || '').toLowerCase();
       if (key.includes('mina')) {
         return `<svg viewBox="0 0 24 24" class="w-full h-full"><circle cx="12" cy="12" r="12" fill="${accentColor}"/><path d="M5 12 C5 6, 19 6, 19 12 L19 16 L5 16 Z" fill="#1e293b"/><circle cx="12" cy="12.5" r="5.5" fill="#fde68a"/><path d="M6.5 11 C8 7.5, 16 7.5, 17.5 11" fill="#1e293b"/><circle cx="10" cy="12.5" r="0.9" fill="#0f172a"/><circle cx="14" cy="12.5" r="0.9" fill="#0f172a"/><path d="M10.5 15 Q12 16.3 13.5 15" fill="none" stroke="#0f172a" stroke-width="1.1" stroke-linecap="round"/></svg>`;
@@ -758,145 +868,39 @@
 
       const zone = this.currentSprawl;
 
-      // 1. Geodesic Outer Proximity Bubble (True meters on map)
-      this.sprawlOuterCircle = L.circle([this.position.lat, this.position.lng], {
-        radius: zone.meters,
-        color: zone.accent,
-        weight: 2,
-        opacity: 0.85,
-        fillColor: zone.accent,
-        fillOpacity: 0.11,
-        interactive: false
-      }).addTo(this.map);
-
-      // 2. Geodesic Inner Horizon Ring
-      this.sprawlInnerCircle = L.circle([this.position.lat, this.position.lng], {
-        radius: zone.meters * 0.52,
-        color: zone.accent,
-        weight: 1.2,
-        dashArray: '5, 6',
-        opacity: 0.55,
-        fillOpacity: 0,
-        interactive: false
-      }).addTo(this.map);
+      // 1 & 2. The radius bubble, painted by the equipped radius cosmetic.
+      this._buildRadiusCircles();
 
       // 3. Walking Trail Polyline
+      const trailStyle = this.cosmeticTrail || {};
       this.walkingPolyline = L.polyline(
         this.userTrailPoints.map((p) => [p.lat, p.lng]),
         {
-          color: '#0d9488',
-          weight: 4,
-          opacity: 0.72,
+          color: trailStyle.color || '#0d9488',
+          weight: trailStyle.weight || 3,
+          opacity: trailStyle.opacity || 0.6,
           lineCap: 'round',
           lineJoin: 'round',
-          dashArray: '1, 7',
+          dashArray: trailStyle.dashArray || '1, 7',
           interactive: false
         }
       ).addTo(this.map);
 
-      // 4. Pokémon-GO-Tier Full-Body 2.5D Articulated Strider Avatar (84x96px, ground anchor at 42,78)
+      // 4. Your wayfinder beacon: a glass compass disc that carries a light.
       const puckHtml = `
-        <div class="user-puck-container" id="radia-strider-puck" title="Your Explorer Strider (${zone.feet}ft Radius)" aria-label="Your Explorer Avatar">
-          <!-- Ground Plane: Expanding Dual Sonar Rings -->
+        <div class="user-puck-container" id="radia-strider-puck" title="Your location · ${zone.feet} ft radius" aria-label="Your location">
           <div class="user-puck-pulse"></div>
-          <div class="user-puck-pulse user-puck-pulse-delay"></div>
-
-          <!-- Ground Plane: Directional Heading Cone & Forward Chevron -->
+          <div class="user-puck-pulse user-puck-pulse--delay"></div>
+          <div class="beacon-aura" aria-hidden="true">
+            <span></span><span></span><span></span><span></span><span></span><span></span>
+          </div>
           <div class="user-puck-heading" id="leaflet-puck-heading" style="transform: rotate(${this.heading || 0}deg)">
             <span class="user-puck-heading-arrow"></span>
           </div>
-
-          <!-- Full-Body 2.5D Articulated Strider SVG (84x96, ground anchor at 42,78) -->
-          <svg class="strider-avatar-svg" viewBox="0 0 84 96" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-              <radialGradient id="striderDiscGlow" cx="50%" cy="50%" r="50%">
-                <stop offset="0%" stop-color="var(--avatar-primary, #0d9488)" stop-opacity="0.42" />
-                <stop offset="65%" stop-color="var(--avatar-accent, #38bdf8)" stop-opacity="0.18" />
-                <stop offset="100%" stop-color="#0f172a" stop-opacity="0" />
-              </radialGradient>
-              <linearGradient id="striderJacketGrad" x1="28" y1="28" x2="56" y2="58" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="var(--avatar-primary, #0d9488)" />
-                <stop offset="55%" stop-color="#0f766e" />
-                <stop offset="100%" stop-color="#0f172a" />
-              </linearGradient>
-              <linearGradient id="striderTrimGrad" x1="30" y1="30" x2="54" y2="54" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="#5eead4" />
-                <stop offset="100%" stop-color="var(--avatar-accent, #38bdf8)" />
-              </linearGradient>
-              <linearGradient id="striderPantsGrad" x1="36" y1="52" x2="48" y2="76" gradientUnits="userSpaceOnUse">
-                <stop offset="0%" stop-color="#1e293b" />
-                <stop offset="100%" stop-color="#090d16" />
-              </linearGradient>
-              <filter id="striderDropShadow" x="-20%" y="-15%" width="140%" height="140%">
-                <feDropShadow dx="0" dy="4" stdDeviation="3" flood-color="#020617" flood-opacity="0.42" />
-              </filter>
-            </defs>
-
-            <!-- 1. ISOMETRIC GROUND SONAR DISC (Centered at 42, 78) -->
-            <ellipse cx="42" cy="78" rx="28" ry="11" fill="url(#striderDiscGlow)" />
-            <ellipse cx="42" cy="78" rx="22" ry="8.5" stroke="var(--avatar-primary, #0d9488)" stroke-width="1.6" stroke-opacity="0.85" fill="rgba(255,255,255,0.65)" />
-            <ellipse class="strider-compass-ring" cx="42" cy="78" rx="16.5" ry="6.2" stroke="var(--avatar-accent, #38bdf8)" stroke-width="1.3" stroke-dasharray="3.5 3" />
-            <ellipse class="strider-ground-shadow" cx="42" cy="78" rx="11" ry="4" fill="#020617" opacity="0.38" />
-
-            <!-- 2. FULL-BODY ARTICULATED CHARACTER RIG -->
-            <g class="strider-rig-root" filter="url(#striderDropShadow)">
-              <!-- BACK ARM (Left Arm — Swings opposite to Left Leg) -->
-              <g class="strider-limb strider-arm-left">
-                <path d="M34 34L28 46L30 52" stroke="#0f766e" stroke-width="5.2" stroke-linecap="round" stroke-linejoin="round" />
-                <circle cx="30" cy="52.5" r="2.4" fill="#fde68a" />
-                <line x1="28.5" y1="50" x2="31.5" y2="50.5" stroke="#5eead4" stroke-width="1.6" stroke-linecap="round" />
-              </g>
-
-              <!-- BACK LEG (Left Leg — Pivot at Hip 38, 53) -->
-              <g class="strider-limb strider-leg-left">
-                <path d="M38 53L35.5 65.5L34.5 74" stroke="url(#striderPantsGrad)" stroke-width="6" stroke-linecap="round" stroke-linejoin="round" />
-                <line x1="35.6" y1="66" x2="35" y2="71.5" stroke="#5eead4" stroke-width="1.3" stroke-linecap="round" />
-                <path d="M31.5 74.5C31.5 72.8 33.2 72 35.8 72L38.5 74.2C39.2 74.8 39 76.2 37.5 76.2H31.8C31.2 76.2 31.5 75.2 31.5 74.5Z" fill="#ffffff" stroke="#0f172a" stroke-width="1.1" />
-                <path d="M31.5 75.8H38.5" stroke="var(--avatar-primary, #0d9488)" stroke-width="1.5" stroke-linecap="round" />
-              </g>
-
-              <!-- FRONT LEG (Right Leg — Pivot at Hip 45, 53) -->
-              <g class="strider-limb strider-leg-right">
-                <path d="M45 53L47.5 65.5L48.5 74" stroke="url(#striderPantsGrad)" stroke-width="6.2" stroke-linecap="round" stroke-linejoin="round" />
-                <line x1="47.4" y1="66" x2="48" y2="71.5" stroke="var(--avatar-accent, #38bdf8)" stroke-width="1.3" stroke-linecap="round" />
-                <path d="M45.5 74C45.5 72.5 47.2 71.8 49.8 72L53.2 74.2C54 74.8 53.8 76.2 52.2 76.2H46C45.4 76.2 45.5 75 45.5 74Z" fill="#ffffff" stroke="#0f172a" stroke-width="1.1" />
-                <path d="M45.8 75.8H53" stroke="var(--avatar-accent, #38bdf8)" stroke-width="1.5" stroke-linecap="round" />
-              </g>
-
-              <!-- TORSO & AERO FIELD-PACK (Pivot at Waist 42, 52) -->
-              <g class="strider-torso">
-                <rect x="31" y="30" width="16" height="19" rx="5" fill="#0f172a" stroke="#334155" stroke-width="1.2" />
-                <path d="M35 33V45" stroke="#38bdf8" stroke-width="1.4" stroke-linecap="round" opacity="0.85" />
-                <path d="M34 30L32 23" stroke="#f59e0b" stroke-width="1.8" stroke-linecap="round" />
-                <circle cx="32" cy="22.5" r="2.3" fill="#fef08a" stroke="#f59e0b" stroke-width="1.2" />
-
-                <path d="M32 32C32 29.8 36.2 28.5 42 28.5C47.8 28.5 52 29.8 52 32L50 53.5C50 54.8 46.5 55.5 42 55.5C37.5 55.5 34 54.8 34 53.5L32 32Z" fill="url(#striderJacketGrad)" stroke="#ffffff" stroke-width="1.3" />
-                <path d="M34.5 35.5L42 42.5L49.5 35.5" stroke="url(#striderTrimGrad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
-                <line x1="42" y1="42.5" x2="42" y2="54.5" stroke="#5eead4" stroke-width="1.3" stroke-opacity="0.7" />
-                <path d="M34.5 29.5C34.5 27.6 37.8 26.5 42 26.5C46.2 26.5 49.5 27.6 49.5 29.5C49.5 31.4 46.2 32.8 42 32.8C37.8 32.8 34.5 29.5Z" fill="#0f172a" stroke="#5eead4" stroke-width="1.2" />
-              </g>
-
-              <!-- FRONT ARM (Right Arm — Swings opposite to Right Leg) -->
-              <g class="strider-limb strider-arm-right">
-                <path d="M50 34L55 45.5L52.5 52" stroke="url(#striderJacketGrad)" stroke-width="5.4" stroke-linecap="round" stroke-linejoin="round" />
-                <path d="M50 34L55 45.5L52.5 52" stroke="#ffffff" stroke-width="0.9" stroke-linecap="round" opacity="0.5" />
-                <line x1="51.2" y1="49.8" x2="54.2" y2="50.4" stroke="#f59e0b" stroke-width="1.8" stroke-linecap="round" />
-                <circle cx="52.3" cy="52.5" r="2.5" fill="#fde68a" />
-              </g>
-
-              <!-- HEAD, DYNAMIC HAIR & AR VISOR (Pivot at Neck 42, 26) -->
-              <g class="strider-head">
-                <circle cx="42" cy="18.5" r="8.2" fill="#fde68a" stroke="#0f172a" stroke-width="1.2" />
-                <rect x="35.8" y="15.8" width="13.5" height="4.6" rx="2.3" fill="#0f172a" stroke="#5eead4" stroke-width="1.1" />
-                <path d="M37.8 17.2H41.5" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.9" />
-                <circle cx="46.2" cy="18.1" r="1" fill="#38bdf8" />
-                <path d="M40.5 22.8C41.3 23.5 43.3 23.5 44.1 22.7" stroke="#0f172a" stroke-width="1.2" stroke-linecap="round" />
-                <path d="M33.2 17.5C33 11.8 37.2 8 42.8 8C47.5 8 51.2 10.8 51.5 15.2C49 13.2 45.8 12.4 41.5 12.8C37.8 13.1 35 14.8 33.2 17.5Z" fill="#0f172a" />
-                <path d="M38 9.2C41 7.2 46.5 7.5 49.5 10.2" stroke="var(--avatar-accent, #38bdf8)" stroke-width="1.3" stroke-linecap="round" opacity="0.8" />
-                <rect x="32.2" y="16" width="3.2" height="5.5" rx="1.6" fill="#0f172a" stroke="#f59e0b" stroke-width="1.1" />
-              </g>
-            </g>
-          </svg>
+          <div class="user-dot">
+            <span class="user-beacon-star" aria-hidden="true"></span>
+            <span class="user-dot-core" aria-hidden="true"></span>
+          </div>
         </div>
       `;
 
@@ -904,8 +908,8 @@
         icon: L.divIcon({
           className: 'radia-user-puck-marker',
           html: puckHtml,
-          iconSize: [84, 96],
-          iconAnchor: [42, 78]
+          iconSize: [68, 68],
+          iconAnchor: [34, 34]
         }),
         zIndexOffset: 1000
       }).addTo(this.map);
@@ -914,6 +918,122 @@
         if (ev && ev.originalEvent) ev.originalEvent.stopPropagation();
         this.spawnFloatingReward(`Active Radius: ${this.currentSprawl.feet}ft (${this.currentSprawl.name})`);
       });
+
+      this.applyCosmetics();
+    }
+
+    /* ------------------------------------------------------------------
+       COSMETICS — radius + trail are real map layers, not just colour.
+       ------------------------------------------------------------------ */
+
+    _equippedCosmetic(slot) {
+      const g = window.RadiaGamification;
+      if (!g || typeof g.getEquippedCosmetic !== 'function') return null;
+      return g.getEquippedCosmetic(slot) || null;
+    }
+
+    _buildRadiusCircles() {
+      if (!this.map || !this.position) return;
+      const zone = this.currentSprawl;
+      const radiusM = this._effectiveRadiusM();
+      const s = this.cosmeticRadius;
+
+      this.radiusClassName = (s && s.className) || '';
+
+      if (this.sprawlOuterCircle) {
+        this.map.removeLayer(this.sprawlOuterCircle);
+        this.sprawlOuterCircle = null;
+      }
+      if (this.sprawlInnerCircle) {
+        this.map.removeLayer(this.sprawlInnerCircle);
+        this.sprawlInnerCircle = null;
+      }
+
+      this.sprawlOuterCircle = L.circle([this.position.lat, this.position.lng], {
+        radius: radiusM,
+        color: (s && s.color) || zone.accent,
+        weight: (s && s.weight) || 1.5,
+        opacity: (s && typeof s.opacity === 'number') ? s.opacity : 0.72,
+        fillColor: (s && (s.fillColor || s.color)) || zone.accent,
+        fillOpacity: (s && typeof s.fillOpacity === 'number') ? s.fillOpacity : 0.075,
+        dashArray: (s && s.dashArray) || null,
+        className: this.radiusClassName,
+        interactive: false
+      }).addTo(this.map);
+
+      const inner = (s && s.inner) || {};
+      this.sprawlInnerCircle = L.circle([this.position.lat, this.position.lng], {
+        radius: radiusM * 0.52,
+        color: inner.color || (s && s.color) || zone.accent,
+        weight: typeof inner.weight === 'number' ? inner.weight : 1,
+        opacity: typeof inner.opacity === 'number' ? inner.opacity : 0.45,
+        dashArray: inner.dashArray || null,
+        fillOpacity: 0,
+        interactive: false
+      }).addTo(this.map);
+    }
+
+    _applyRadiusStyle() {
+      if (!this.sprawlOuterCircle && !this.sprawlInnerCircle) return;
+      const zone = this.currentSprawl;
+      const s = this.cosmeticRadius;
+      const inner = (s && s.inner) || {};
+
+      if (this.sprawlOuterCircle) {
+        this.sprawlOuterCircle.setStyle(s ? {
+          color: s.color,
+          weight: s.weight,
+          opacity: typeof s.opacity === 'number' ? s.opacity : 0.72,
+          fillColor: s.fillColor || s.color,
+          fillOpacity: typeof s.fillOpacity === 'number' ? s.fillOpacity : 0.075,
+          dashArray: s.dashArray || null
+        } : {
+          color: zone.accent, weight: 1.5, opacity: 0.72,
+          fillColor: zone.accent, fillOpacity: 0.075, dashArray: null
+        });
+      }
+
+      if (this.sprawlInnerCircle) {
+        this.sprawlInnerCircle.setStyle(s ? {
+          color: inner.color || s.color,
+          weight: typeof inner.weight === 'number' ? inner.weight : 1,
+          opacity: typeof inner.opacity === 'number' ? inner.opacity : 0.4,
+          dashArray: inner.dashArray || null
+        } : {
+          color: zone.accent, weight: 1, opacity: 0.45, dashArray: '4, 7'
+        });
+      }
+    }
+
+    /* Called by the gamification engine on load and after every equip. */
+    applyCosmetics() {
+      const trail = this._equippedCosmetic('trail');
+      const radius = this._equippedCosmetic('radius');
+      this.cosmeticTrail = (trail && trail.style) || null;
+      this.cosmeticRadius = (radius && radius.style) || null;
+
+      if (this.walkingPolyline && this.cosmeticTrail) {
+        const t = this.cosmeticTrail;
+        this.walkingPolyline.setStyle({
+          color: t.color,
+          weight: t.weight,
+          opacity: t.opacity,
+          dashArray: t.dashArray || null,
+          lineCap: 'round',
+          lineJoin: 'round'
+        });
+      }
+
+      if (this.sprawlOuterCircle || this.sprawlInnerCircle) {
+        const nextClass = (this.cosmeticRadius && this.cosmeticRadius.className) || '';
+        if (nextClass !== this.radiusClassName) {
+          this._buildRadiusCircles();
+        } else {
+          this._applyRadiusStyle();
+        }
+      }
+
+      return this;
     }
 
     _syncNativeLeafletUserLayers() {
@@ -938,20 +1058,16 @@
 
       if (this.sprawlOuterCircle) {
         this.sprawlOuterCircle.setLatLng(latlng);
-        this.sprawlOuterCircle.setRadius(zone.meters);
-        this.sprawlOuterCircle.setStyle({
-          color: zone.accent,
-          fillColor: zone.accent
-        });
+        this.sprawlOuterCircle.setRadius(this._effectiveRadiusM());
       }
 
       if (this.sprawlInnerCircle) {
         this.sprawlInnerCircle.setLatLng(latlng);
-        this.sprawlInnerCircle.setRadius(zone.meters * 0.52);
-        this.sprawlInnerCircle.setStyle({
-          color: zone.accent
-        });
+        this.sprawlInnerCircle.setRadius(this._effectiveRadiusM() * 0.52);
       }
+
+      // The equipped radius cosmetic owns the stroke; fall back to the zone.
+      this._applyRadiusStyle();
 
       if (this.walkingPolyline) {
         this.walkingPolyline.setLatLngs(this.userTrailPoints.map((p) => [p.lat, p.lng]));
@@ -1086,7 +1202,7 @@
         const name = (peer.profile && peer.profile.firstName) || 'Member';
         const color = peer.color || '#0d9488';
         const avatarSvg = this._getNeighborAvatarSVG(name, color);
-        const inBubble = distM <= this.currentSprawl.meters;
+        const inBubble = distM <= this._effectiveRadiusM();
 
         const html = `
           <div class="neighbor-orb-pin ${inBubble ? 'is-in-bubble' : ''}"
@@ -1375,9 +1491,15 @@
       ];
 
       this._writeJSON(CONFIG.KEY_LAST_POSITION, { lat, lng });
-      this._seedWorldEnvironment(lat, lng);
-      this._renderLandmarkMarkers();
-      this._seedRoamingExplorers();
+      if (this.demoMode) {
+        this._seedWorldEnvironment(lat, lng);
+        this._renderLandmarkMarkers();
+        this._seedRoamingExplorers();
+      } else {
+        this.landmarks = [];
+        this._renderLandmarkMarkers();
+        this._renderRoamingExplorerMarkers();
+      }
 
       if (recommendedSprawl && SPRAWL_ZONES[recommendedSprawl]) {
         this.setSprawlZone(recommendedSprawl, true);
@@ -1709,6 +1831,38 @@
           this.openNearbyDirectory();
         });
       }
+
+      const walkBtn = document.getElementById('btn-track-walk');
+      if (walkBtn) {
+        walkBtn.addEventListener('click', () => this.toggleWalkTracking());
+      }
+
+      const coordsChip = document.getElementById('hud-pace-readout');
+      if (coordsChip) {
+        coordsChip.addEventListener('click', () => this.requestLocation());
+      }
+
+      const locateBtn = document.getElementById('btn-empty-locate');
+      if (locateBtn) {
+        locateBtn.addEventListener('click', () => this.requestLocation());
+      }
+
+      const widenBtn = document.getElementById('btn-empty-widen');
+      if (widenBtn) {
+        widenBtn.addEventListener('click', () => this.cycleSprawlZone(true));
+      }
+
+      const emptyHelpBtn = document.getElementById('btn-empty-help');
+      if (emptyHelpBtn) {
+        emptyHelpBtn.addEventListener('click', () => {
+          const guide = document.getElementById('modal-quick-guide');
+          if (guide) guide.classList.add('active');
+        });
+      }
+
+      this._updatePresenceChip();
+      this._refreshWalkHud();
+      this._markActiveProvider();
     }
 
     setMode(mode) {
@@ -1743,18 +1897,10 @@
       const label = document.getElementById('label-availability');
       const btn = document.getElementById('btn-toggle-availability');
       if (label) {
-        label.textContent = this.isAvailable ? 'Open' : 'Paused';
-        label.className = this.isAvailable
-          ? 'text-[11px] font-extrabold text-teal-700'
-          : 'text-[11px] font-extrabold text-slate-500';
+        label.textContent = this.isAvailable ? 'Open to talk' : 'Paused';
       }
       if (btn) {
-        const dot = btn.querySelector('.avail-dot');
-        if (dot) {
-          dot.className = this.isAvailable
-            ? 'avail-dot w-2 h-2 rounded-full bg-teal-500 animate-pulse'
-            : 'avail-dot w-2 h-2 rounded-full bg-slate-400';
-        }
+        btn.classList.toggle('is-paused', !this.isAvailable);
       }
 
       this._updatePresenceChip();
@@ -1777,9 +1923,56 @@
             timestamp: pos.timestamp || Date.now(),
             simulated: false
           });
+          if (!this._centredOnFirstFix) {
+            this._centredOnFirstFix = true;
+            this.followMode = true;
+            if (this.map) this.map.setView([latitude, longitude], CONFIG.DEFAULT_ZOOM, { animate: true });
+          }
         },
-        () => {},
+        (err) => this._handleGpsError(err),
         { enableHighAccuracy: true, maximumAge: 2000, timeout: 10000 }
+      );
+    }
+
+    _handleGpsError(err) {
+      const code = err && err.code;
+      // 1 = PERMISSION_DENIED, 2 = POSITION_UNAVAILABLE, 3 = TIMEOUT
+      this.gpsError = code === 1 ? 'denied' : code === 3 ? 'timeout' : 'unavailable';
+      this._updatePaceAndCoordsHUD(false);
+      if (this._gpsErrorNotified === this.gpsError) return;
+      this._gpsErrorNotified = this.gpsError;
+      if (window.RadiaApp) {
+        const msg = code === 1
+          ? 'Location blocked — allow it in your browser to appear where you are'
+          : 'Waiting for a GPS signal';
+        window.RadiaApp.showToast(msg, 'amber');
+      }
+    }
+
+    /** Explicit, user-initiated location request (used by the empty state). */
+    requestLocation() {
+      if (!('geolocation' in navigator)) {
+        if (window.RadiaApp) window.RadiaApp.showToast('This browser has no location support', 'amber');
+        return;
+      }
+      this.startGPS();
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const { latitude, longitude, accuracy } = pos.coords;
+          this.hasRealFix = true;
+          this.followMode = true;
+          this._ingestPosition({
+            lat: latitude,
+            lng: longitude,
+            accuracy: accuracy || 12,
+            timestamp: pos.timestamp || Date.now(),
+            simulated: false
+          });
+          if (this.map) this.map.setView([latitude, longitude], CONFIG.DEFAULT_ZOOM, { animate: true });
+          if (window.RadiaApp) window.RadiaApp.showToast('You are on the map', 'emerald');
+        },
+        (err) => this._handleGpsError(err),
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
       );
     }
 
@@ -1792,6 +1985,7 @@
 
     _ingestPosition(fix) {
       this.position = fix;
+      if (fix && fix.simulated === false) this.hasRealFix = true;
 
       let delta = 0;
       const ref = this.lastAccruedPosition;
@@ -1800,7 +1994,10 @@
         const dt = Math.max(0.001, (fix.timestamp - ref.timestamp) / 1000);
         const speed = raw / dt;
 
-        if (raw >= CONFIG.MIN_STEP_M && (fix.simulated || speed <= CONFIG.MAX_PLAUSIBLE_SPEED_MS)) {
+        // Only genuine GPS movement (or an explicit demo session) earns
+        // distance. Tapping the map must never mint credits.
+        const eligible = this.demoMode ? true : !fix.simulated;
+        if (raw >= CONFIG.MIN_STEP_M && eligible && speed <= CONFIG.MAX_PLAUSIBLE_SPEED_MS) {
           delta = raw;
           this.totalDistanceM += delta;
           this.sessionDistanceM += delta;
@@ -1811,11 +2008,6 @@
 
           this.userTrailPoints.push({ lat: fix.lat, lng: fix.lng });
           if (this.userTrailPoints.length > 60) this.userTrailPoints.shift();
-
-          if (this.stepToastAccumulatorM >= 25) {
-            this.stepToastAccumulatorM %= 25;
-            this.spawnFloatingReward('+8 Credits • +6 XP');
-          }
         }
       } else {
         this.lastAccruedPosition = fix;
@@ -1827,17 +2019,96 @@
         this.map.panTo([fix.lat, fix.lng], { animate: true, duration: 0.35 });
       }
 
-      this._writeJSON(CONFIG.KEY_LAST_POSITION, { lat: fix.lat, lng: fix.lng });
+      // Persist whether this was a real fix, so a sample location can never be
+      // restored as the user's position on the next visit.
+      this._writeJSON(CONFIG.KEY_LAST_POSITION, { lat: fix.lat, lng: fix.lng, real: fix.simulated === false });
       this._updatePaceAndCoordsHUD(delta > 0);
       this._evaluateHotspots();
+      if (this.walkTracking) this._refreshWalkHud();
       if (delta > 0) this._emitDistance(delta);
       this._renderRoamingExplorerMarkers();
       this._evaluateAllPeers();
+
+      // Presence transports listen for this to republish our whereabouts.
+      this._dispatch('RADIA_POSITION_UPDATED', {
+        lat: fix.lat,
+        lng: fix.lng,
+        simulated: !!fix.simulated
+      });
+    }
+
+    /**
+     * Accepts peers from any presence transport (local BroadcastChannel or a
+     * hosted realtime channel). These are REAL people, so they are never marked
+     * simulated and they carry no invented profile fields.
+     */
+    _ingestPresencePeers(list) {
+      const seen = new Set();
+
+      (list || []).forEach((entry) => {
+        if (!entry || !entry.id) return;
+        if (typeof entry.lat !== 'number' || typeof entry.lng !== 'number') return;
+        seen.add(entry.id);
+
+        const distM = Geo.haversine(this.position.lat, this.position.lng, entry.lat, entry.lng);
+        const existing = this.peers.get(entry.id);
+
+        this.peers.set(entry.id, {
+          peerId: entry.id,
+          profile: {
+            firstName: entry.name || 'Someone nearby',
+            preferredTimer: 300,
+            level: 1,
+            bioTag: `${Math.round(Geo.metersToFeet(distM))}ft away`,
+            contactHandle: ''
+          },
+          color: '#0b4f3f',
+          lat: entry.lat,
+          lng: entry.lng,
+          walkHeading: existing ? existing.walkHeading : 0,
+          accuracy: 15,
+          simulated: false,
+          roaming: false,
+          lastSeen: entry.ts || Date.now(),
+          inRange: distM <= this._effectiveRadiusM(),
+          cooldownUntil: existing ? existing.cooldownUntil : 0
+        });
+      });
+
+      // Retire presence peers that left, and their markers.
+      Array.from(this.peers.keys()).forEach((id) => {
+        const peer = this.peers.get(id);
+        if (!peer || peer.simulated) return;
+        if (seen.has(id)) return;
+        this.peers.delete(id);
+        const marker = this.roamingPeerMarkers.get(id);
+        if (marker) marker.remove();
+        this.roamingPeerMarkers.delete(id);
+      });
+
+      this._renderRoamingExplorerMarkers();
+      this._updatePresenceChip();
+      this._syncNativeLeafletUserLayers();
     }
 
     _updatePaceAndCoordsHUD(isMoving) {
       const paceEl = document.getElementById('hud-pace-readout');
       if (!paceEl || !this.position) return;
+
+      // Never imply a GPS fix we do not have.
+      if (!this.hasRealFix) {
+        paceEl.textContent = this.demoMode
+          ? 'Preview location'
+          : this.gpsError === 'denied'
+            ? 'Location off · tap to retry'
+            : 'Use my location';
+        paceEl.title = 'Show your real position on the map';
+        paceEl.classList.toggle('is-demo', this.demoMode);
+        paceEl.classList.toggle('is-preview', !this.demoMode);
+        return;
+      }
+      paceEl.classList.remove('is-preview', 'is-demo');
+
       if (isMoving || this.walkTarget || this.mode === 'simulate') {
         paceEl.textContent = `4.8 km/h • 112 spm`;
       } else {
@@ -2015,9 +2286,61 @@
     }
 
     _updatePresenceChip() {
+      // Never inflate the count: a quiet radius is a real product state.
+      const count = this.peers.size;
       const countEl = document.getElementById('nearby-member-count-text');
       if (countEl) {
-        countEl.textContent = `${Math.max(1, this.peers.size)} nearby`;
+        countEl.textContent = count === 1 ? '1 nearby' : `${count} nearby`;
+      }
+      const empty = document.getElementById('radar-empty-state');
+      if (empty) empty.classList.toggle('hidden', count > 0);
+    }
+
+    /* ----------------------------------------------------------------
+       WALK TRACKING — the only source of distance credit is a real GPS fix
+       ---------------------------------------------------------------- */
+
+    toggleWalkTracking() {
+      if (this.walkTracking) {
+        this.stopWalkTracking();
+      } else {
+        this.startWalkTracking();
+      }
+      return this.walkTracking;
+    }
+
+    startWalkTracking() {
+      this.walkTracking = true;
+      this.walkSessionStartM = this.totalDistanceM;
+      this.followMode = true;
+      this.startGPS();
+      const btn = document.getElementById('btn-track-walk');
+      if (btn) btn.classList.add('is-recording');
+      this._refreshWalkHud();
+      if (window.RadiaApp) {
+        window.RadiaApp.showToast('Walk tracking on', 'emerald');
+      }
+    }
+
+    stopWalkTracking() {
+      this.walkTracking = false;
+      const btn = document.getElementById('btn-track-walk');
+      if (btn) btn.classList.remove('is-recording');
+      this._refreshWalkHud();
+      if (window.RadiaApp) {
+        const km = ((this.totalDistanceM - (this.walkSessionStartM || 0)) / 1000).toFixed(2);
+        window.RadiaApp.showToast(`Walk saved · ${km} km`, 'emerald');
+      }
+    }
+
+    _refreshWalkHud() {
+      const label = document.getElementById('walk-status-label');
+      if (!label) return;
+      if (this.walkTracking) {
+        const km = Math.max(0, (this.totalDistanceM - (this.walkSessionStartM || 0)) / 1000);
+        label.textContent = `${km.toFixed(2)} km`;
+      } else {
+        label.textContent = 'Start walk';
       }
     }
 

@@ -50,48 +50,288 @@
     { level: 7, title: 'Radia Fellow', xpRequired: 5000, auraClass: 'aura-tier-4', auraColor: '#7c3aed', desc: 'Violet Perspective Ring' }
   ];
 
-  const AURA_COSMETICS = [
+  const COSMETIC_SLOTS = [
+    { id: 'marker', label: 'Marker', note: 'How you stand on the map' },
+    { id: 'trail', label: 'Trail', note: 'The line you leave behind' },
+    { id: 'radius', label: 'Radius', note: 'The edge of your bubble' },
+    { id: 'aura', label: 'Aura', note: 'The air around you' }
+  ];
+
+  const STAR_CLIP = 'polygon(50% 0%, 61% 38%, 100% 50%, 61% 62%, 50% 100%, 39% 62%, 0% 50%, 39% 38%)';
+  const STAR_CLIP_4 = 'polygon(50% 0%, 58% 42%, 100% 50%, 58% 58%, 50% 100%, 42% 58%, 0% 50%, 42% 42%)';
+
+  /* Every cosmetic is a map behaviour, not a badge: markers repaint the
+     medallion, trails restyle the walked line, radii restyle the bubble,
+     auras add a small living field around you. */
+  const COSMETICS = [
+    /* ---------------------------------------------------------------- MARKERS */
     {
-      id: 'aura_emerald',
-      name: 'Botanical Teal Ring',
-      subtitle: 'Signature architectural teal accent • Tier 1 Default',
-      auraClass: 'aura-tier-1',
-      primary: '#0d9488',
-      accent: '#14b8a6',
-      unlockLevel: 1,
-      luminaCost: 0
+      id: 'marker_wayfinder',
+      slot: 'marker',
+      name: 'Wayfinder',
+      blurb: 'Glass medallion, white compass star, ember core.',
+      rarity: 'everyday',
+      cost: 0,
+      primary: '#0f766e',
+      accent: '#e8996d',
+      beacon: {
+        discA: '#1f7460', discB: '#0b4f3f', discC: '#06362a',
+        star: '#f7fbf8', core: '#e8996d', ring: 'rgba(255,255,255,0.94)',
+        glow: 'rgba(20, 110, 90, 0.35)', clip: STAR_CLIP
+      }
     },
     {
-      id: 'aura_solar',
-      name: 'Warm Terracotta & Amber',
-      subtitle: 'Golden hour profile ring • Tier 2 or 120 Credits',
-      auraClass: 'aura-tier-2',
-      primary: '#d97706',
-      accent: '#f59e0b',
-      unlockLevel: 2,
-      luminaCost: 120
+      id: 'marker_lantern',
+      slot: 'marker',
+      name: 'Lantern',
+      blurb: 'Amber glass and a flame-white star that warms the map.',
+      rarity: 'everyday',
+      cost: 80,
+      primary: '#b45309',
+      accent: '#fbbf24',
+      beacon: {
+        discA: '#c2740f', discB: '#8a3d09', discC: '#481c05',
+        star: '#fff7e6', core: '#fff1c2', ring: 'rgba(255,247,230,0.95)',
+        glow: 'rgba(217, 119, 6, 0.5)', clip: STAR_CLIP
+      }
     },
     {
-      id: 'aura_cyan',
-      name: 'Coastal Azure Ring',
-      subtitle: 'Crisp marine horizon accent • Tier 4 or 240 Credits',
-      auraClass: 'aura-tier-3',
-      primary: '#0284c7',
-      accent: '#38bdf8',
-      unlockLevel: 4,
-      luminaCost: 240
+      id: 'marker_tideglass',
+      slot: 'marker',
+      name: 'Tideglass',
+      blurb: 'Deep sea-green glass with an ice-white star.',
+      rarity: 'rare',
+      cost: 120,
+      primary: '#0e7490',
+      accent: '#67e8f9',
+      beacon: {
+        discA: '#0e7490', discB: '#155e75', discC: '#082f49',
+        star: '#e6fbff', core: '#fcd34d', ring: 'rgba(230,251,255,0.92)',
+        glow: 'rgba(34, 211, 238, 0.4)', clip: STAR_CLIP
+      }
     },
     {
-      id: 'aura_prismatic',
-      name: 'Indigo Synthesis Ring',
-      subtitle: 'Deep perspective violet ring • Tier 6 or 400 Credits',
-      auraClass: 'aura-tier-4',
-      primary: '#7c3aed',
-      accent: '#a855f7',
-      unlockLevel: 6,
-      luminaCost: 400
+      id: 'marker_blossom',
+      slot: 'marker',
+      name: 'Blossom',
+      blurb: 'Porcelain shell, pine star, terracotta heart.',
+      rarity: 'rare',
+      cost: 200,
+      primary: '#9d6b53',
+      accent: '#c2552a',
+      beacon: {
+        discA: '#fff8f3', discB: '#fbe8dd', discC: '#f2d6c7',
+        star: '#0b4f3f', core: '#c2552a', ring: 'rgba(255,255,255,0.9)',
+        glow: 'rgba(226, 164, 129, 0.45)', clip: STAR_CLIP
+      }
+    },
+    {
+      id: 'marker_obsidian',
+      slot: 'marker',
+      name: 'Obsidian',
+      blurb: 'Black stone cut with a single lime signal.',
+      rarity: 'signature',
+      cost: 340,
+      primary: '#334155',
+      accent: '#a3e635',
+      beacon: {
+        discA: '#30363d', discB: '#141a20', discC: '#05070a',
+        star: '#e5e7eb', core: '#a3e635', ring: 'rgba(255,255,255,0.78)',
+        glow: 'rgba(163, 230, 53, 0.28)', clip: 'polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%)'
+      }
+    },
+    {
+      id: 'marker_solstice',
+      slot: 'marker',
+      name: 'Solstice',
+      blurb: 'Burnt-orange brass, cream star, low sun.',
+      rarity: 'signature',
+      cost: 460,
+      primary: '#c2410c',
+      accent: '#fde68a',
+      beacon: {
+        discA: '#b45309', discB: '#7c2d12', discC: '#3f1508',
+        star: '#fffbeb', core: '#fde68a', ring: 'rgba(255,251,235,0.9)',
+        glow: 'rgba(251, 146, 60, 0.5)', clip: STAR_CLIP_4
+      }
+    },
+
+    /* ----------------------------------------------------------------- TRAILS */
+    {
+      id: 'trail_stardust',
+      slot: 'trail',
+      name: 'Stardust',
+      blurb: 'A close dotted thread of pine light.',
+      rarity: 'everyday',
+      cost: 0,
+      style: { color: '#14b8a6', weight: 3, opacity: 0.55, dashArray: '1 7' }
+    },
+    {
+      id: 'trail_ribbon',
+      slot: 'trail',
+      name: 'Ribbon',
+      blurb: 'One soft continuous stroke, barely there.',
+      rarity: 'everyday',
+      cost: 60,
+      style: { color: '#2dd4bf', weight: 6, opacity: 0.28 }
+    },
+    {
+      id: 'trail_comet',
+      slot: 'trail',
+      name: 'Comet',
+      blurb: 'Long amber dashes that read like a tail.',
+      rarity: 'rare',
+      cost: 110,
+      style: { color: '#f59e0b', weight: 3, opacity: 0.8, dashArray: '10 9', className: 'trail-comet' }
+    },
+    {
+      id: 'trail_firefly',
+      slot: 'trail',
+      name: 'Firefly',
+      blurb: 'Widely spaced gold sparks along your route.',
+      rarity: 'rare',
+      cost: 160,
+      style: { color: '#fbbf24', weight: 2.5, opacity: 0.9, dashArray: '1 10', className: 'trail-comet' }
+    },
+    {
+      id: 'trail_ink',
+      slot: 'trail',
+      name: 'Ink',
+      blurb: 'A fine charcoal line, like a map annotation.',
+      rarity: 'everyday',
+      cost: 70,
+      style: { color: '#64748b', weight: 2, opacity: 0.7, dashArray: '2 6' }
+    },
+
+    /* ----------------------------------------------------------------- RADII */
+    {
+      id: 'radius_quiet',
+      slot: 'radius',
+      name: 'Quiet Ring',
+      blurb: 'A thin mint edge and a dashed inner horizon.',
+      rarity: 'everyday',
+      cost: 0,
+      style: {
+        color: '#2dd4bf', weight: 1.5, opacity: 0.72, fillColor: '#2dd4bf', fillOpacity: 0.07,
+        inner: { color: '#2dd4bf', weight: 1, opacity: 0.42, dashArray: '4 7' }
+      }
+    },
+    {
+      id: 'radius_signal',
+      slot: 'radius',
+      name: 'Signal',
+      blurb: 'A dashed beacon edge with no fill at all.',
+      rarity: 'everyday',
+      cost: 90,
+      style: {
+        color: '#38bdf8', weight: 1.6, opacity: 0.85, fillColor: '#38bdf8', fillOpacity: 0,
+        dashArray: '6 10',
+        inner: { color: '#38bdf8', weight: 1, opacity: 0.35, dashArray: '2 10' }
+      }
+    },
+    {
+      id: 'radius_bloom',
+      slot: 'radius',
+      name: 'Bloom',
+      blurb: 'A pale filled disc that glows at the rim.',
+      rarity: 'rare',
+      cost: 140,
+      style: {
+        color: '#5eead4', weight: 1, opacity: 0.6, fillColor: '#5eead4', fillOpacity: 0.15,
+        className: 'radius-bloom',
+        inner: { color: '#5eead4', weight: 1, opacity: 0.25, dashArray: '1 9' }
+      }
+    },
+    {
+      id: 'radius_ember',
+      slot: 'radius',
+      name: 'Ember Ring',
+      blurb: 'A warm boundary, dashed like a coal seam.',
+      rarity: 'rare',
+      cost: 190,
+      style: {
+        color: '#fb923c', weight: 1.8, opacity: 0.8, fillColor: '#fb923c', fillOpacity: 0.08,
+        dashArray: '10 6',
+        inner: { color: '#fb923c', weight: 1, opacity: 0.4, dashArray: '2 8' }
+      }
+    },
+    {
+      id: 'radius_aurora',
+      slot: 'radius',
+      name: 'Aurora',
+      blurb: 'A slow violet current travelling the edge.',
+      rarity: 'signature',
+      cost: 320,
+      style: {
+        color: '#a78bfa', weight: 2, opacity: 0.8, fillColor: '#a78bfa', fillOpacity: 0.10,
+        dashArray: '18 12', className: 'radius-aurora',
+        inner: { color: '#c4b5fd', weight: 1, opacity: 0.35, dashArray: '1 12' }
+      }
+    },
+
+    /* ----------------------------------------------------------------- AURAS */
+    {
+      id: 'aura_none',
+      slot: 'aura',
+      name: 'Still Air',
+      blurb: 'Nothing but the pulse. The quiet default.',
+      rarity: 'everyday',
+      cost: 0,
+      aura: { color: '#7fc3a8', accent: '#e8996d' }
+    },
+    {
+      id: 'aura_motes',
+      slot: 'aura',
+      name: 'Motes',
+      blurb: 'Warm dust lifting off the ground around you.',
+      rarity: 'everyday',
+      cost: 100,
+      aura: { color: '#fbbf24', accent: '#f59e0b' }
+    },
+    {
+      id: 'aura_fireflies',
+      slot: 'aura',
+      name: 'Fireflies',
+      blurb: 'Six slow green sparks circling your medallion.',
+      rarity: 'rare',
+      cost: 140,
+      aura: { color: '#a3e635', accent: '#65a30d' }
+    },
+    {
+      id: 'aura_petals',
+      slot: 'aura',
+      name: 'Petals',
+      blurb: 'Pale blossom drifting up and away.',
+      rarity: 'rare',
+      cost: 180,
+      aura: { color: '#fda4af', accent: '#fb7185' }
+    },
+    {
+      id: 'aura_halo',
+      slot: 'aura',
+      name: 'Halo',
+      blurb: 'Two rings breathing outward in sequence.',
+      rarity: 'rare',
+      cost: 260,
+      aura: { color: '#7fc3a8', accent: '#d1fae5' }
+    },
+    {
+      id: 'aura_constellation',
+      slot: 'aura',
+      name: 'Constellation',
+      blurb: 'Small stars orbiting you, joined by a faint arc.',
+      rarity: 'signature',
+      cost: 400,
+      aura: { color: '#c4b5fd', accent: '#f0abfc' }
     }
   ];
+
+  const DEFAULT_EQUIPPED = {
+    marker: 'marker_wayfinder',
+    trail: 'trail_stardust',
+    radius: 'radius_quiet',
+    aura: 'aura_none'
+  };
 
   const ACHIEVEMENTS = [
     {
@@ -148,6 +388,7 @@
     constructor() {
       this.state = this._loadState();
       this.accruedDistanceBufferM = 0;
+      this.shopSlot = 'marker';
     }
 
     _loadState() {
@@ -170,8 +411,13 @@
         totalReflections: typeof s.totalReflections === 'number' ? s.totalReflections : 4,
         spotsHarvested: typeof s.spotsHarvested === 'number' ? s.spotsHarvested : 1,
         lifetimeMeters: typeof s.lifetimeMeters === 'number' ? s.lifetimeMeters : 340,
-        equippedAuraId: s.equippedAuraId || 'aura_emerald',
-        unlockedAuras: Array.isArray(s.unlockedAuras) ? s.unlockedAuras : ['aura_emerald', 'aura_solar'],
+        equippedCosmetics: {
+          ...DEFAULT_EQUIPPED,
+          ...(s.equippedCosmetics && typeof s.equippedCosmetics === 'object' ? s.equippedCosmetics : {})
+        },
+        ownedCosmetics: Array.isArray(s.ownedCosmetics)
+          ? Array.from(new Set([...s.ownedCosmetics, ...Object.values(DEFAULT_EQUIPPED)]))
+          : [...Object.values(DEFAULT_EQUIPPED)],
         unlockedAchievements: Array.isArray(s.unlockedAchievements) ? s.unlockedAchievements : ['first_spark', 'trailblazer'],
         claimedQuests: Array.isArray(s.claimedQuests) ? s.claimedQuests : [],
         claimedMilestones: Array.isArray(s.claimedMilestones) ? s.claimedMilestones : []
@@ -190,7 +436,7 @@
     init() {
       this._bindEvents();
       this._bindQuickActionButtons();
-      this._applyEquippedAuraToDOM();
+      this._applyCosmeticsToDOM();
       setTimeout(() => this.evaluateAchievementsAndQuests(), 350);
       this.refreshUI();
       return this;
@@ -299,12 +545,6 @@
         }
       }
       this.state.level = currentRank.level;
-
-      AURA_COSMETICS.forEach((aura) => {
-        if (this.state.level >= aura.unlockLevel && !this.state.unlockedAuras.includes(aura.id)) {
-          this.state.unlockedAuras.push(aura.id);
-        }
-      });
 
       this._saveState();
       this.refreshUI();
@@ -445,32 +685,68 @@
       return true;
     }
 
-    equipOrUnlockAura(auraId) {
-      const aura = AURA_COSMETICS.find((a) => a.id === auraId);
-      if (!aura) return false;
-
-      if (!this.state.unlockedAuras.includes(auraId)) {
-        if (this.state.luminaCoins < aura.luminaCost && this.state.level < aura.unlockLevel) {
-          return { ok: false, reason: `Requires ${aura.luminaCost} Credits or Tier ${aura.unlockLevel}` };
-        }
-        if (this.state.level < aura.unlockLevel) {
-          this.state.luminaCoins -= aura.luminaCost;
-        }
-        this.state.unlockedAuras.push(auraId);
-      }
-
-      this.state.equippedAuraId = auraId;
-      this._saveState();
-      this._applyEquippedAuraToDOM();
-      this.refreshUI();
-      if (window.RadiaAudio) window.RadiaAudio.playSpotHarvest();
-      return { ok: true, aura };
+    getEquippedCosmetic(slot) {
+      const id = (this.state.equippedCosmetics || {})[slot];
+      return COSMETICS.find((c) => c.id === id)
+        || COSMETICS.find((c) => c.id === DEFAULT_EQUIPPED[slot])
+        || COSMETICS[0];
     }
 
-    _applyEquippedAuraToDOM() {
-      const aura = AURA_COSMETICS.find((a) => a.id === this.state.equippedAuraId) || AURA_COSMETICS[0];
-      document.documentElement.style.setProperty('--avatar-primary', aura.primary);
-      document.documentElement.style.setProperty('--avatar-accent', aura.accent);
+    ownsCosmetic(id) {
+      return Array.isArray(this.state.ownedCosmetics) && this.state.ownedCosmetics.includes(id);
+    }
+
+    buyOrEquipCosmetic(id) {
+      const cosmetic = COSMETICS.find((c) => c.id === id);
+      if (!cosmetic) return { ok: false, reason: 'Unknown cosmetic' };
+
+      let purchased = false;
+      if (!this.ownsCosmetic(id)) {
+        if (this.state.luminaCoins < cosmetic.cost) {
+          const short = cosmetic.cost - this.state.luminaCoins;
+          return { ok: false, reason: `Need ${short.toLocaleString()} more credits` };
+        }
+        this.state.luminaCoins -= cosmetic.cost;
+        this.state.ownedCosmetics.push(id);
+        purchased = true;
+      }
+
+      this.state.equippedCosmetics[cosmetic.slot] = id;
+      this._saveState();
+      this._applyCosmeticsToDOM();
+      this.refreshUI();
+      if (window.RadiaAudio) window.RadiaAudio.playSpotHarvest();
+      return { ok: true, cosmetic, purchased };
+    }
+
+    /* One place that turns owned cosmetics into map appearance. */
+    _applyCosmeticsToDOM() {
+      const marker = this.getEquippedCosmetic('marker');
+      const aura = this.getEquippedCosmetic('aura');
+      const skin = marker.beacon || {};
+      const auraStyle = aura.aura || {};
+      const root = document.documentElement;
+      const style = root.style;
+
+      style.setProperty('--beacon-disc-a', skin.discA || '#1f7460');
+      style.setProperty('--beacon-disc-b', skin.discB || '#0b4f3f');
+      style.setProperty('--beacon-disc-c', skin.discC || '#06362a');
+      style.setProperty('--beacon-star', skin.star || '#f7fbf8');
+      style.setProperty('--beacon-core', skin.core || '#e8996d');
+      style.setProperty('--beacon-ring', skin.ring || 'rgba(255,255,255,0.94)');
+      style.setProperty('--beacon-glow', skin.glow || 'rgba(20,110,90,0.35)');
+      style.setProperty('--beacon-clip', skin.clip || STAR_CLIP);
+      style.setProperty('--avatar-primary', marker.primary || '#0f766e');
+      style.setProperty('--avatar-accent', marker.accent || '#e8996d');
+      style.setProperty('--aura-color', auraStyle.color || '#7fc3a8');
+      style.setProperty('--aura-accent', auraStyle.accent || '#e8996d');
+
+      root.dataset.beacon = marker.id.replace('marker_', '');
+      root.dataset.aura = aura.id.replace('aura_', '');
+
+      if (window.RadiaProximity && typeof window.RadiaProximity.applyCosmetics === 'function') {
+        window.RadiaProximity.applyCosmetics();
+      }
     }
 
     getCurrentRank() {
@@ -570,8 +846,8 @@
       // 5. Render Spatial & Connection Milestones
       this._renderAchievementsGrid(spatial);
 
-      // 6. Render Profile Ring Accents
-      this._renderAuraList();
+      // 6. Render the cosmetics shelf
+      this._renderCosmeticShop();
     }
 
     _renderMilestonesTrack() {
@@ -598,7 +874,7 @@
                   ? `<span class="text-[10px] font-bold text-teal-700">Claimed ✓</span>`
                   : reached
                   ? `<button type="button" class="btn-amber px-2.5 py-0.5 rounded-lg text-[10px] font-bold ms-claim-btn" data-ms-id="${ms.id}">Claim</button>`
-                  : `<span class="text-[10px] text-slate-500">+${ms.rewardXP} XP</span>`
+                  : ''
               }
             </div>
           </div>
@@ -680,42 +956,119 @@
       }).join('');
     }
 
-    _renderAuraList() {
-      const container = document.getElementById('climb-aura-list');
-      if (!container) return;
+    _renderCosmeticShop() {
+      const shelf = document.getElementById('cosmetic-shelf');
+      const tabs = document.getElementById('cosmetic-tabs');
+      if (!shelf || !tabs) return;
 
-      container.innerHTML = AURA_COSMETICS.map((aura) => {
-        const unlocked = this.state.unlockedAuras.includes(aura.id) || this.state.level >= aura.unlockLevel;
-        const equipped = this.state.equippedAuraId === aura.id;
+      const slot = this.shopSlot || 'marker';
+      const balance = document.getElementById('shop-credit-balance');
+      if (balance) balance.textContent = this.state.luminaCoins.toLocaleString();
 
+      tabs.innerHTML = COSMETIC_SLOTS.map((s) => {
+        const items = COSMETICS.filter((c) => c.slot === s.id);
+        const owned = items.filter((c) => this.ownsCosmetic(c.id)).length;
         return `
-          <div class="flex items-center justify-between p-3 rounded-2xl bg-slate-100/80 border ${equipped ? 'border-teal-500/50' : 'border-slate-200'}">
-            <div class="flex items-center gap-3">
-              <span class="w-4 h-4 rounded-full shadow-sm" style="background: linear-gradient(135deg, ${aura.primary}, ${aura.accent});"></span>
-              <div>
-                <p class="text-xs font-bold text-slate-900">${aura.name}</p>
-                <p class="text-[10px] text-slate-500">${aura.subtitle}</p>
-              </div>
-            </div>
-            ${
-              equipped
-                ? `<span class="px-2.5 py-1 rounded-full bg-teal-500/15 border border-teal-500/30 text-[10px] font-bold text-teal-700 uppercase">Active</span>`
-                : unlocked
-                ? `<button type="button" class="btn-glass px-3 py-1.5 rounded-xl text-[11px] font-bold text-teal-700 aura-action-btn" data-aura-id="${aura.id}">Apply</button>`
-                : `<button type="button" class="btn-glass px-3 py-1.5 rounded-xl text-[11px] font-bold text-amber-700 aura-action-btn" data-aura-id="${aura.id}">Unlock (${aura.luminaCost} pts)</button>`
-            }
-          </div>
-        `;
+          <button type="button" class="cos-tab ${s.id === slot ? 'is-active' : ''}"
+            data-slot="${s.id}" role="tab" aria-selected="${s.id === slot}">
+            <span>${s.label}</span>
+            <span class="cos-tab-count">${owned}/${items.length}</span>
+          </button>`;
       }).join('');
 
-      container.querySelectorAll('.aura-action-btn').forEach((btn) => {
+      shelf.innerHTML = COSMETICS.filter((c) => c.slot === slot)
+        .map((c) => this._cosmeticCard(c))
+        .join('');
+
+      const note = document.getElementById('cosmetic-slot-note');
+      const slotInfo = COSMETIC_SLOTS.find((s) => s.id === slot);
+      if (note && slotInfo) note.textContent = slotInfo.note;
+
+      tabs.querySelectorAll('.cos-tab').forEach((btn) => {
         btn.addEventListener('click', () => {
-          const res = this.equipOrUnlockAura(btn.getAttribute('data-aura-id'));
-          if (res && res.ok === false && window.RadiaApp) {
+          this.shopSlot = btn.getAttribute('data-slot');
+          this._renderCosmeticShop();
+        });
+      });
+
+      shelf.querySelectorAll('.cos-action').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const res = this.buyOrEquipCosmetic(btn.getAttribute('data-id'));
+          if (!window.RadiaApp) return;
+          if (res && res.ok === false) {
             window.RadiaApp.showToast(res.reason, 'amber');
+          } else if (res && res.ok) {
+            window.RadiaApp.showToast(
+              res.purchased ? `${res.cosmetic.name} added to your collection` : `${res.cosmetic.name} equipped`,
+              'emerald'
+            );
           }
         });
       });
+    }
+
+    _cosmeticCard(c) {
+      const owned = this.ownsCosmetic(c.id);
+      const equipped = this.state.equippedCosmetics[c.slot] === c.id;
+      const short = !owned && this.state.luminaCoins < c.cost;
+
+      return `
+        <article class="cos-card ${equipped ? 'is-equipped' : ''}" data-id="${c.id}">
+          ${this._cosmeticPreview(c)}
+          <div class="cos-meta">
+            <span class="cos-rarity cos-rarity--${c.rarity}">${c.rarity}</span>
+            <h4>${c.name}</h4>
+            <p>${c.blurb}</p>
+          </div>
+          <div class="cos-foot">
+            <span class="cos-price ${short ? 'is-short' : ''}">${owned ? 'Owned' : `${c.cost} cr`}</span>
+            ${equipped
+              ? `<span class="cos-worn">On you</span>`
+              : `<button type="button" class="cos-action ${short ? 'is-short' : ''}" data-id="${c.id}">${owned ? 'Wear' : 'Buy'}</button>`}
+          </div>
+        </article>`;
+    }
+
+    _cosmeticPreview(c) {
+      if (c.slot === 'marker') {
+        const b = c.beacon || {};
+        return `
+          <div class="cos-stage">
+            <span class="cos-disc" style="background: radial-gradient(circle at 34% 26%, ${b.discA}, ${b.discB} 62%, ${b.discC}); border-color: ${b.ring}; box-shadow: 0 0 20px ${b.glow}, 0 3px 10px rgba(0,0,0,0.4);">
+              <span class="cos-star" style="background: ${b.star}; clip-path: ${b.clip};"></span>
+              <span class="cos-core" style="background: ${b.core};"></span>
+            </span>
+          </div>`;
+      }
+
+      if (c.slot === 'trail') {
+        const s = c.style || {};
+        return `
+          <div class="cos-stage cos-stage--flat">
+            <span class="cos-line ${s.dashArray ? 'is-dashed' : ''}"
+              style="--line: ${s.color}; --thick: ${Math.min(6, s.weight || 3)}px; --opacity: ${s.opacity || 0.7}; ${s.dashArray ? `--dash: ${s.dashArray};` : ''}"></span>
+          </div>`;
+      }
+
+      if (c.slot === 'radius') {
+        const s = c.style || {};
+        const fill = s.fillOpacity
+          ? `color-mix(in srgb, ${s.color} ${Math.round(s.fillOpacity * 100)}%, transparent)`
+          : 'transparent';
+        return `
+          <div class="cos-stage">
+            <span class="cos-ring" style="border-color: ${s.color}; border-style: ${s.dashArray ? 'dashed' : 'solid'}; opacity: ${s.opacity || 0.7}; background: ${fill};"></span>
+            <span class="cos-ring cos-ring--inner" style="border-color: ${(s.inner && s.inner.color) || s.color};"></span>
+          </div>`;
+      }
+
+      const a = c.aura || {};
+      const dots = c.id === 'aura_none' ? '' : '<i></i><i></i><i></i><i></i>';
+      return `
+        <div class="cos-stage cos-stage--aura" style="--aura: ${a.color}; --aura-2: ${a.accent};">
+          <span class="cos-token"></span>
+          <span class="cos-dots">${dots}</span>
+        </div>`;
     }
   }
 

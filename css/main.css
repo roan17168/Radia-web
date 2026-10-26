@@ -552,8 +552,9 @@ button:active {
 
 /* Global Floating Toast Notification */
 #radia-global-toast {
-  position: absolute;
-  top: 68px;
+  position: fixed;
+  top: auto;
+  bottom: calc(104px + env(safe-area-inset-bottom, 0px));
   left: 50%;
   transform: translateX(-50%) translateY(-16px);
   z-index: 200;

@@ -1,0 +1,1929 @@
+/* ==========================================================================
+   RADIA — FIELD INSTRUMENT THEME (css/theme.css)
+   --------------------------------------------------------------------------
+   Loaded last. One deliberate visual system for every tab: paper, ink, pine.
+   Replaces the mixed glass/arcade/SaaS styling the app accumulated.
+   Contract: DESIGN.md
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. TOKENS
+   -------------------------------------------------------------------------- */
+
+:root {
+  --ink: #111a17;
+  --ink-2: #3a4742;
+  --ink-3: #6c7a73;
+  --paper: #f1f0ea;
+  --paper-deep: #e8e6dd;
+  --surface: #fcfbf7;
+  --surface-2: #f6f4ee;
+  --line: #dedcd2;
+  --line-strong: #cbc8bc;
+  --pine: #0b4f3f;
+  --pine-deep: #073a2e;
+  --pine-soft: #e3ebe4;
+  --ember: #c2552a;
+  --ember-soft: #f6e7dd;
+  --sky: #3c6e86;
+
+  --font-display: 'Newsreader', Georgia, 'Times New Roman', serif;
+  --font-ui: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, monospace;
+
+  --r-control: 10px;
+  --r-card: 16px;
+  --r-sheet: 22px;
+
+  --sh-1: 0 1px 2px rgba(17, 26, 23, 0.05);
+  --sh-2: 0 2px 4px rgba(17, 26, 23, 0.05), 0 10px 24px rgba(17, 26, 23, 0.07);
+  --sh-3: 0 4px 10px rgba(17, 26, 23, 0.07), 0 24px 56px rgba(17, 26, 23, 0.12);
+
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-1: 120ms;
+  --dur-2: 180ms;
+  --dur-3: 240ms;
+
+  /* Remap the legacy tokens the app already uses */
+  --bg-app: var(--paper);
+  --bg-card: var(--surface);
+  --bg-card-solid: var(--surface);
+  --bg-subtle: var(--surface-2);
+  --bg-pill: var(--surface);
+  --bg-dock: var(--surface);
+  --border-subtle: var(--line);
+  --border-strong: var(--line-strong);
+  --border-active: rgba(11, 79, 63, 0.4);
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink-2);
+  --text-muted: var(--ink-3);
+  --brand-primary: var(--pine);
+  --brand-primary-dark: var(--pine-deep);
+  --brand-emerald: #16775e;
+  --brand-amber: var(--ember);
+  --brand-indigo: var(--sky);
+  --brand-rose: #a33a2c;
+  --avatar-primary: var(--pine);
+  --avatar-accent: var(--ember);
+  --shadow-card: var(--sh-2);
+  --shadow-floating: var(--sh-3);
+  --shadow-primary: 0 6px 16px rgba(11, 79, 63, 0.22);
+  --ease-spring: var(--ease-out);
+  --ease-smooth: var(--ease-out);
+
+  /* Radar HUD tokens */
+  --radia-surface: var(--surface);
+  --radia-surface-solid: var(--surface);
+  --radia-ink: var(--ink);
+  --radia-ink-soft: var(--ink-3);
+  --radia-line: var(--line);
+  --radia-accent: var(--pine);
+  --radia-accent-soft: var(--pine-soft);
+  --radia-amber: var(--ember);
+  --radia-shadow-sm: var(--sh-1);
+  --radia-shadow-md: var(--sh-3);
+}
+
+html.theme-dark {
+  --ink: #edefe9;
+  --ink-2: #c2cbc3;
+  --ink-3: #8d9a91;
+  --paper: #0d1512;
+  --paper-deep: #0a110e;
+  --surface: #131d19;
+  --surface-2: #18241f;
+  --line: #26332d;
+  --line-strong: #33423a;
+  --pine: #7fc3a8;
+  --pine-deep: #a4d8c1;
+  --pine-soft: rgba(127, 195, 168, 0.14);
+  --ember: #e8996d;
+  --ember-soft: rgba(232, 153, 109, 0.14);
+
+  --bg-app: var(--paper);
+  --bg-card: var(--surface);
+  --bg-card-solid: var(--surface);
+  --bg-subtle: var(--surface-2);
+  --bg-pill: var(--surface);
+  --bg-dock: var(--surface);
+  --border-subtle: var(--line);
+  --border-strong: var(--line-strong);
+  --text-primary: var(--ink);
+  --text-secondary: var(--ink-2);
+  --text-muted: var(--ink-3);
+  --brand-primary: var(--pine);
+  --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.03), 0 12px 28px rgba(0, 0, 0, 0.45);
+  --shadow-floating: 0 2px 8px rgba(0, 0, 0, 0.5), 0 30px 60px rgba(0, 0, 0, 0.55);
+}
+
+/* --------------------------------------------------------------------------
+   2. BASE
+   -------------------------------------------------------------------------- */
+
+html,
+body {
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  font-feature-settings: 'ss01' on, 'cv11' on;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+
+h1 {
+  font-size: clamp(22px, 5.4vw, 30px);
+  line-height: 1.1;
+}
+
+h2 {
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+h3 {
+  font-size: 14px;
+  line-height: 1.3;
+  font-weight: 600;
+}
+
+/* The app's old headings were sans-extrabold; keep the intent but on the new face */
+h1.font-extrabold,
+h2.font-extrabold,
+h3.font-extrabold {
+  font-weight: 500;
+}
+
+.uppercase,
+[class*='tracking-wider'],
+[class*='tracking-widest'] {
+  letter-spacing: 0.11em;
+}
+
+.font-mono-code,
+code,
+kbd {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: var(--pine);
+  color: var(--surface);
+}
+
+:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--pine) 60%, transparent);
+  outline-offset: 2px;
+}
+
+/* --------------------------------------------------------------------------
+   3. TAILWIND UTILITY REMAP
+   The markup is written with the slate scale. Rather than rewrite every class,
+   remap the handful of utilities the app actually uses onto the new palette.
+   -------------------------------------------------------------------------- */
+
+.text-slate-900,
+.text-slate-800 {
+  color: var(--ink) !important;
+}
+.text-slate-700,
+.text-slate-600 {
+  color: var(--ink-2) !important;
+}
+.text-slate-500,
+.text-slate-400 {
+  color: var(--ink-3) !important;
+}
+.text-teal-700,
+.text-teal-600 {
+  color: var(--pine) !important;
+}
+.text-amber-700,
+.text-amber-600,
+.text-amber-500 {
+  color: var(--ember) !important;
+}
+
+.bg-slate-100,
+.bg-slate-100\/80,
+.bg-slate-50,
+.bg-slate-200 {
+  background-color: var(--surface-2) !important;
+}
+.bg-white {
+  background-color: var(--surface) !important;
+}
+.border-slate-200,
+.border-slate-300 {
+  border-color: var(--line) !important;
+}
+.divide-slate-200 > * + * {
+  border-color: var(--line) !important;
+}
+
+.bg-teal-500\/15,
+.bg-teal-500\/10 {
+  background-color: var(--pine-soft) !important;
+}
+.bg-amber-500\/15 {
+  background-color: var(--ember-soft) !important;
+}
+.border-amber-500\/35,
+.border-amber-500\/40 {
+  border-color: color-mix(in srgb, var(--ember) 35%, transparent) !important;
+}
+.border-teal-500\/35 {
+  border-color: color-mix(in srgb, var(--pine) 35%, transparent) !important;
+}
+
+/* --------------------------------------------------------------------------
+   4. SURFACES
+   -------------------------------------------------------------------------- */
+
+.glass-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: var(--sh-1);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html.theme-dark .glass-panel {
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+.glass-pill {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--sh-1);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+.app-view {
+  animation: view-in var(--dur-3) var(--ease-out) both;
+}
+
+@keyframes view-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.app-view > header h1,
+.app-view > header h2 {
+  font-family: var(--font-display);
+}
+
+/* Section eyebrows */
+.app-view > header > div > span:first-child,
+.radar-eyebrow {
+  font-family: var(--font-ui);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pine);
+}
+
+/* --------------------------------------------------------------------------
+   5. BUTTONS
+   -------------------------------------------------------------------------- */
+
+.btn-emerald,
+.btn-glass,
+.btn-amber {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  letter-spacing: -0.005em;
+  border-radius: var(--r-control);
+  transition: background var(--dur-1) var(--ease-out),
+    border-color var(--dur-1) var(--ease-out),
+    color var(--dur-1) var(--ease-out),
+    transform var(--dur-1) var(--ease-out),
+    box-shadow var(--dur-1) var(--ease-out);
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.btn-emerald {
+  background: var(--pine) !important;
+  background-image: none !important;
+  color: var(--surface) !important;
+  border: 1px solid var(--pine) !important;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset !important;
+}
+
+.btn-emerald:hover {
+  background: var(--pine-deep) !important;
+  background-image: none !important;
+  border-color: var(--pine-deep) !important;
+}
+
+/* main.css forces gradient fills on amber too */
+.btn-amber {
+  background: var(--ember) !important;
+  background-image: none !important;
+  border-color: var(--ember) !important;
+}
+
+/* Demo-only controls never render in a real build */
+html:not(.demo-mode) [data-demo-only] {
+  display: none !important;
+}
+
+/* Progress meters: one solid signal colour, no gradient rainbow */
+[class*='from-teal-600'],
+[class*='bg-gradient-to-r'] {
+  background-image: none !important;
+  background-color: var(--pine) !important;
+}
+
+/* Uppercase section headings are UI text, not display serif */
+h1.uppercase,
+h2.uppercase,
+h3.uppercase {
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  color: var(--ink-2);
+}
+
+html.theme-dark .btn-emerald {
+  color: #08130f;
+}
+
+html.theme-dark .btn-emerald:hover {
+  background: #9ad9c0;
+}
+
+.btn-glass {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+}
+
+.btn-glass:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-2);
+}
+
+.btn-amber {
+  background: var(--ember);
+  color: var(--surface);
+  border: 1px solid var(--ember);
+}
+
+.btn-emerald:active,
+.btn-glass:active,
+.btn-amber:active,
+.radar-chip--action:active,
+.radar-icon-btn:active {
+  transform: scale(0.98);
+}
+
+.btn-emerald:disabled,
+.btn-glass:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* --------------------------------------------------------------------------
+   6. FORMS
+   -------------------------------------------------------------------------- */
+
+input[type='text'],
+input[type='search'],
+input[type='email'],
+textarea,
+select {
+  font-family: var(--font-ui);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  color: var(--ink);
+  transition: border-color var(--dur-1) var(--ease-out),
+    box-shadow var(--dur-1) var(--ease-out);
+}
+
+input[type='text']:focus,
+input[type='search']:focus,
+input[type='email']:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--pine) 55%, var(--line));
+  box-shadow: 0 0 0 3px rgba(11, 79, 63, 0.12);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--ink-3);
+}
+
+/* main.css paints dark inputs navy; keep them in the same green-grey family */
+html.theme-dark input[type='text'],
+html.theme-dark input[type='search'],
+html.theme-dark input[type='email'],
+html.theme-dark textarea,
+html.theme-dark select {
+  background-color: var(--surface) !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+}
+
+input[type='checkbox'] {
+  accent-color: var(--pine);
+}
+
+label {
+  color: var(--ink-2);
+}
+
+/* --------------------------------------------------------------------------
+   7. DOCK
+   -------------------------------------------------------------------------- */
+
+#bottom-dock {
+  /* Neutralise the legacy full-width bar in main.css: this is a floating pill. */
+  position: fixed;
+  left: 50%;
+  right: auto;
+  bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  height: auto;
+  transform: translateX(-50%);
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.7) inset,
+    0 10px 26px -12px rgba(12, 34, 26, 0.35),
+    0 2px 6px rgba(12, 34, 26, 0.06);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  padding: 5px;
+  gap: 2px;
+}
+
+.dock-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border-radius: 999px;
+  color: var(--ink-3);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  transition: color 0.18s var(--ease-out),
+    background 0.28s cubic-bezier(0.2, 0.8, 0.2, 1),
+    transform 0.18s var(--ease-out);
+}
+
+.dock-item i,
+.dock-item svg {
+  width: 17px;
+  height: 17px;
+  stroke-width: 1.8;
+  transition: transform 0.25s cubic-bezier(0.34, 1.4, 0.64, 1);
+}
+
+.dock-item:hover {
+  color: var(--ink);
+  background: var(--surface-2);
+}
+
+.dock-item:hover svg {
+  transform: translateY(-1px);
+}
+
+.dock-item:active {
+  transform: scale(0.965);
+}
+
+.dock-item.active {
+  color: var(--pine);
+  background: var(--pine-soft);
+  font-weight: 600;
+}
+
+.dock-item.active svg {
+  stroke-width: 2;
+  transform: translateY(-0.5px);
+}
+
+.dock-badge {
+  background: var(--pine);
+  color: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 999px;
+}
+
+html.theme-dark .dock-badge {
+  color: #08130f;
+}
+
+/* --------------------------------------------------------------------------
+   8. MODALS & SHEETS
+   -------------------------------------------------------------------------- */
+
+.encounter-modal-backdrop {
+  background: rgba(17, 26, 23, 0.42);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: fade-in var(--dur-2) var(--ease-out) both;
+}
+
+.encounter-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-sheet);
+  box-shadow: var(--sh-3);
+  animation: sheet-in var(--dur-3) var(--ease-out) both;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sheet-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   9. TABS, FILTERS, SEGMENTED CONTROLS
+   -------------------------------------------------------------------------- */
+
+.journal-filter-btn,
+.constellation-mode-btn,
+.map-provider-btn,
+.city-jump-btn,
+.theme-select-btn,
+.timer-pref-btn,
+.sprawl-zone-btn,
+.feedback-rating-btn,
+.appearance-mode-btn {
+  font-family: var(--font-ui);
+  font-weight: 500;
+  border-radius: var(--r-control);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink-2);
+  transition: background var(--dur-1) var(--ease-out),
+    color var(--dur-1) var(--ease-out),
+    border-color var(--dur-1) var(--ease-out);
+}
+
+.journal-filter-btn:hover,
+.constellation-mode-btn:hover,
+.map-provider-btn:hover,
+.city-jump-btn:hover,
+.theme-select-btn:hover,
+.timer-pref-btn:hover,
+.sprawl-zone-btn:hover,
+.appearance-mode-btn:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+.journal-filter-btn.btn-emerald,
+.constellation-mode-btn.btn-emerald,
+.city-jump-btn.btn-emerald,
+.theme-select-btn.btn-emerald,
+.timer-pref-btn.btn-emerald,
+.sprawl-zone-btn.btn-emerald,
+.appearance-mode-btn.btn-emerald {
+  background: var(--pine);
+  border-color: var(--pine);
+  color: var(--surface);
+}
+
+html.theme-dark .journal-filter-btn.btn-emerald,
+html.theme-dark .constellation-mode-btn.btn-emerald,
+html.theme-dark .theme-select-btn.btn-emerald,
+html.theme-dark .timer-pref-btn.btn-emerald,
+html.theme-dark .sprawl-zone-btn.btn-emerald,
+html.theme-dark .appearance-mode-btn.btn-emerald {
+  color: #08130f;
+}
+
+/* Map styles sit on a track: the chosen style is a raised chip, not a slab. */
+.map-provider-btn.is-active,
+.map-provider-btn.btn-emerald {
+  background: var(--surface) !important;
+  border-color: transparent !important;
+  color: var(--pine) !important;
+  box-shadow: 0 1px 2px rgba(14, 32, 25, 0.10),
+    0 3px 8px -5px rgba(14, 32, 25, 0.24);
+}
+
+html.theme-dark .map-provider-btn.is-active,
+html.theme-dark .map-provider-btn.btn-emerald {
+  background: #2a3d34 !important;
+  color: #d8f3e5 !important;
+  box-shadow: 0 0 0 1px rgba(127, 195, 168, 0.26) inset,
+    0 2px 6px rgba(0, 0, 0, 0.30);
+}
+
+/* --------------------------------------------------------------------------
+   10. LISTS, METRICS, MISC SURFACES
+   -------------------------------------------------------------------------- */
+
+#constellation-node-inspector {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+}
+
+.constellation-stage {
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  box-shadow: none;
+}
+
+html.theme-dark .constellation-stage {
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+
+#radia-global-toast {
+  background: var(--ink);
+  color: var(--paper);
+  border: 1px solid transparent;
+  border-radius: 999px;
+  box-shadow: var(--sh-3);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 500;
+  padding: 9px 16px;
+}
+
+html.theme-dark #radia-global-toast {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--line);
+}
+
+#radia-global-toast i,
+#radia-global-toast svg {
+  color: currentColor;
+  opacity: 0.8;
+}
+
+/* Achievement / quest rows keep their own layout, unified surface */
+.milestone-track-grid > *,
+#climb-quests-list > *,
+#climb-aura-list > *,
+#climb-achievements-grid > * {
+  border-radius: var(--r-control);
+}
+
+/* Raw anchor styling inside long-form content */
+.app-view a:not(.btn-glass):not(.btn-emerald) {
+  color: var(--pine);
+  text-underline-offset: 2px;
+}
+
+/* Scrollbars: quiet */
+.app-view {
+  scrollbar-width: thin;
+  scrollbar-color: var(--line-strong) transparent;
+}
+
+.app-view::-webkit-scrollbar {
+  width: 8px;
+}
+
+.app-view::-webkit-scrollbar-thumb {
+  background: var(--line-strong);
+  border-radius: 8px;
+}
+
+/* Graph controls move to the top-right so they stop covering the
+   "same 1-mile cluster" caption drawn at the bottom of the canvas. */
+.graph-zoom-controls {
+  top: auto;
+  right: 10px;
+  bottom: 10px;
+  left: auto;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-control);
+  box-shadow: var(--sh-1);
+  padding: 3px;
+}
+
+.graph-zoom-controls .btn-glass {
+  border-color: transparent;
+  box-shadow: none;
+  min-width: 26px;
+  padding: 2px 6px;
+  font-size: 10.5px;
+}
+
+/* On phones the graph is driven by pinch-zoom; overlay controls only crowd it. */
+@media (max-width: 719px) {
+  .graph-zoom-controls {
+    display: none;
+  }
+}
+
+/* Narrow phones: four dock labels need a little less air */
+@media (max-width: 430px) {
+  .dock-item {
+    gap: 5px;
+    padding: 8px 9px;
+    font-size: 11.5px;
+  }
+
+  #bottom-dock {
+    padding: 5px 4px;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   11. COLLECTION DISCLOSURE (Activity)
+   -------------------------------------------------------------------------- */
+
+.collection-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-card);
+  background: var(--surface);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: border-color var(--dur-2) var(--ease-out), background var(--dur-2) var(--ease-out);
+}
+
+.collection-toggle:hover {
+  border-color: var(--line-strong);
+  background: var(--surface-raised);
+}
+
+.collection-toggle:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+.collection-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.collection-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: var(--ink-3);
+}
+
+.collection-chevron {
+  transition: transform var(--dur-2) var(--ease-out);
+}
+
+.collection-toggle.open .collection-chevron {
+  transform: rotate(180deg);
+}
+
+#activity-collection {
+  margin-top: 14px;
+  animation: rise-in var(--dur-2) var(--ease-out) both;
+}
+
+/* --------------------------------------------------------------------------
+   12. VIEW HEAD, PANELS, FIELDS
+   -------------------------------------------------------------------------- */
+
+.view-head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 2px 2px 0;
+}
+
+.view-head .eyebrow {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--pine);
+  margin-bottom: 5px;
+}
+
+.view-head h1 {
+  font-family: var(--font-display);
+  font-size: clamp(26px, 5.5vw, 34px);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  margin: 0 0 6px;
+  color: var(--ink);
+}
+
+.view-head p {
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-3);
+  margin: 0;
+  max-width: 64ch;
+}
+
+.view-head-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  padding: 20px;
+  box-shadow: var(--sh-1);
+}
+
+.panel-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-bottom: 6px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.panel-head h3 {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  margin: 0;
+  color: var(--ink);
+}
+
+.panel-note {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.01em;
+  color: var(--ink-3);
+  text-align: right;
+}
+
+.panel-split {
+  height: 1px;
+  background: var(--line);
+  margin: 18px 0 16px;
+}
+
+.panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+/* Standing ---------------------------------------------------------------- */
+
+.standing-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.standing-rank {
+  min-width: 0;
+}
+
+.rank-title {
+  font-family: var(--font-display);
+  font-size: clamp(22px, 5.4vw, 25px);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  margin: 0;
+  color: var(--ink);
+}
+
+.tier-chip {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--pine);
+  background: var(--pine-soft);
+  border-radius: 999px;
+  padding: 2px 7px;
+  margin-left: 4px;
+  vertical-align: 1px;
+}
+
+.credits {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.credits .panel-label {
+  white-space: nowrap;
+  letter-spacing: 0.08em;
+}
+
+.credits-value {
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ember);
+  line-height: 1;
+}
+
+.xp {
+  margin-top: 18px;
+}
+
+.xp-track {
+  height: 5px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  overflow: hidden;
+}
+
+.xp-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--pine);
+  transition: width 0.6s var(--ease-out);
+}
+
+.xp-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 8px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--ink-3);
+}
+
+.stat-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 18px 0 0;
+  padding: 0;
+}
+
+.stat {
+  border-top: 1px solid var(--line);
+  padding: 13px 0 0;
+  min-width: 0;
+}
+
+.stat + .stat {
+  border-left: 1px solid var(--line);
+  padding-left: 16px;
+}
+
+.stat dt {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.stat dd {
+  margin: 5px 0 0;
+  font-family: var(--font-mono);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  white-space: nowrap;
+}
+
+.stat dd.stat-small {
+  font-size: 12px;
+  letter-spacing: 0;
+}
+
+.stat-row--3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* Quests and milestones --------------------------------------------------- */
+
+.quest-list > div,
+#climb-aura-list > div {
+  background: transparent !important;
+  border: 0 !important;
+  border-top: 1px solid var(--line) !important;
+  border-radius: 0 !important;
+  padding: 13px 0 !important;
+  gap: 8px;
+}
+
+.quest-list > div:first-child,
+#climb-aura-list > div:first-child {
+  border-top: 0 !important;
+  padding-top: 2px !important;
+}
+
+#climb-quests-list .h-2 {
+  height: 4px !important;
+}
+
+#climb-milestones-grid .h-1\.5 {
+  height: 3px !important;
+}
+
+.milestone-track-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 22px;
+}
+
+.milestone-track-grid .milestone-node {
+  background: transparent !important;
+  border: 0 !important;
+  border-top: 1px solid var(--line) !important;
+  border-radius: 0 !important;
+  padding: 12px 0 !important;
+  gap: 7px !important;
+}
+
+.milestone-track-grid .milestone-node.reached {
+  border-top-color: var(--pine) !important;
+}
+
+/* Two columns squeeze the label and the reward into each other on a phone. */
+@media (max-width: 560px) {
+  /* Four stat columns on a phone: the numbers have to stay inside their cell. */
+  #view-climb .stat dd {
+    font-size: 15px;
+  }
+
+  #view-climb .stat dt {
+    font-size: 8.5px;
+    letter-spacing: 0.07em;
+  }
+
+  #view-climb .stat + .stat {
+    padding-left: 10px;
+  }
+
+  .milestone-track-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .milestone-track-grid .milestone-node {
+    padding: 13px 0 !important;
+  }
+}
+
+.badge-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(258px, 1fr));
+  gap: 0 22px;
+}
+
+.badge-grid > * {
+  border: 0 !important;
+  border-top: 1px solid var(--line) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  padding: 13px 0 !important;
+}
+
+/* Badge names were truncated to "First ..." on narrow cards. */
+#climb-achievements-grid .truncate {
+  overflow: visible;
+  white-space: normal;
+  text-overflow: clip;
+}
+
+#climb-achievements-grid .flex-shrink-0 {
+  color: var(--ink-2);
+  filter: saturate(0.4);
+}
+
+/* Badge reward chips must not squeeze or wrap into the title. */
+#climb-achievements-grid .achievement-card > div:last-child > div:first-child > span {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+#climb-achievements-grid > .achievement-card,
+#climb-aura-list > div {
+  background: transparent !important;
+}
+
+#climb-aura-list button {
+  white-space: nowrap;
+  font-size: 10.5px;
+  height: 30px;
+  padding: 0 11px;
+}
+
+/* Neutralise the legacy slate/teal/amber utility colours inside these tabs */
+#view-climb .text-teal-700,
+#view-settings .text-teal-700 {
+  color: var(--pine) !important;
+}
+
+#view-climb .text-amber-700,
+#view-climb .text-amber-600 {
+  /* Reward numbers are information, not a second accent colour. */
+  color: var(--ink-2) !important;
+  font-weight: 600;
+}
+
+#view-climb .text-slate-900,
+#view-climb .text-slate-800,
+#view-climb .text-slate-700,
+#view-settings .text-slate-900,
+#view-settings .text-slate-700 {
+  color: var(--ink) !important;
+}
+
+#view-climb .text-slate-500,
+#view-settings .text-slate-500 {
+  color: var(--ink-3) !important;
+}
+
+#view-climb .bg-slate-200,
+#view-settings .bg-slate-200 {
+  background: var(--surface-2) !important;
+}
+
+#view-climb .bg-slate-100\/80,
+#view-settings .bg-slate-100\/80 {
+  background: var(--surface-2) !important;
+}
+
+#view-climb .bg-gradient-to-r {
+  background-image: none !important;
+  background-color: var(--pine) !important;
+}
+
+#view-climb .bg-teal-500\/15,
+#view-climb .bg-teal-500\/10,
+#view-climb .bg-amber-500\/10 {
+  background: var(--surface-2) !important;
+}
+
+#view-climb .border-slate-200,
+#view-settings .border-slate-200,
+#view-climb .border-slate-300,
+#view-settings .border-slate-300 {
+  border-color: var(--line) !important;
+}
+
+#view-climb .border-teal-500\/30 {
+  border-color: var(--line) !important;
+}
+
+#view-climb .border-amber-500\/50,
+#view-climb .border-amber-500\/30 {
+  border-color: var(--ember) !important;
+}
+
+#view-climb .btn-amber {
+  background: var(--ember) !important;
+  border-color: var(--ember) !important;
+  color: var(--surface) !important;
+}
+
+/* Settings fields --------------------------------------------------------- */
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.field--spaced {
+  margin-top: 18px;
+}
+
+.field > label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ink-2);
+}
+
+.field > input {
+  height: 40px;
+  padding: 0 12px;
+  font-size: 12.5px;
+  width: 100%;
+}
+
+.field-inline {
+  display: flex;
+  gap: 8px;
+}
+
+.field-inline > input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+}
+
+.field-note {
+  font-size: 11.5px;
+  line-height: 1.5;
+  color: var(--ink-3);
+  margin: 8px 0 0;
+}
+
+.field-note--top {
+  margin: 0 0 12px;
+}
+
+.field-optional {
+  font-weight: 400;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-left: 4px;
+}
+
+.btn-inline {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: var(--r-control);
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.btn-block {
+  width: 100%;
+  height: 42px;
+  margin-top: 12px;
+  border-radius: var(--r-control);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.btn-danger {
+  height: 40px;
+  padding: 0 16px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ember);
+  font-size: 12px;
+  font-weight: 600;
+  transition: background var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out);
+}
+
+.btn-danger:hover {
+  background: var(--ember-soft);
+  border-color: var(--ember);
+}
+
+.btn-ghost-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink-2);
+  font-size: 11.5px;
+  font-weight: 600;
+  transition: background var(--dur-1) var(--ease-out), border-color var(--dur-1) var(--ease-out);
+}
+
+.btn-ghost-sm:hover {
+  background: var(--surface-2);
+  border-color: var(--line-strong);
+}
+
+/* Segmented controls ------------------------------------------------------ */
+
+/* Segmented controls are a track with a raised chip, not a wall of buttons. */
+.segmented {
+  display: grid;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 14px;
+  background: var(--paper-deep);
+  border: 1px solid var(--line);
+}
+
+.segmented--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.segmented--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.segmented--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+#view-settings .segmented--wrap {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+}
+
+.segmented button {
+  height: 34px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  border: 0 !important;
+  border-radius: 11px !important;
+  background: transparent !important;
+  color: var(--ink-3) !important;
+  box-shadow: none !important;
+  transition: background 0.2s var(--ease-out), color 0.2s var(--ease-out),
+    box-shadow 0.2s var(--ease-out);
+}
+
+.segmented button:hover {
+  color: var(--ink) !important;
+}
+
+.segmented button.btn-emerald,
+.segmented button.is-active {
+  background: var(--surface) !important;
+  color: var(--pine) !important;
+  box-shadow: 0 1px 2px rgba(14, 32, 25, 0.10),
+    0 4px 10px -6px rgba(14, 32, 25, 0.28) !important;
+}
+
+/* main.css forces white on every child of .btn-emerald; the segmented chip
+   is a light surface, so the label has to inherit the pine ink instead. */
+.segmented button.btn-emerald *,
+.segmented button.is-active *,
+.segmented button.btn-emerald:hover * {
+  color: var(--pine) !important;
+  stroke: var(--pine) !important;
+}
+
+html.theme-dark .segmented button.btn-emerald,
+html.theme-dark .segmented button.is-active {
+  /* In Evening the raised chip has to be lighter than its track. */
+  background: #2a3d34 !important;
+  color: #d8f3e5 !important;
+  box-shadow: 0 0 0 1px rgba(127, 195, 168, 0.26) inset,
+    0 2px 6px rgba(0, 0, 0, 0.30) !important;
+}
+
+html.theme-dark .segmented button.btn-emerald *,
+html.theme-dark .segmented button.is-active * {
+  color: #d8f3e5 !important;
+  stroke: #d8f3e5 !important;
+}
+
+@media (max-width: 640px) {
+  .segmented--wrap { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .segmented--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .field-grid { grid-template-columns: 1fr; }
+}
+
+/* Switches ---------------------------------------------------------------- */
+
+.switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+
+.switch-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.switch-note {
+  display: block;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--ink-3);
+  margin-top: 2px;
+  max-width: 42ch;
+}
+
+input.switch {
+  appearance: none;
+  -webkit-appearance: none;
+  flex-shrink: 0;
+  width: 42px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--surface-2);
+  border: 1px solid var(--line-strong);
+  position: relative;
+  cursor: pointer;
+  transition: background var(--dur-2) var(--ease-out), border-color var(--dur-2) var(--ease-out);
+}
+
+input.switch::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  transition: transform var(--dur-2) var(--ease-out);
+}
+
+input.switch:checked {
+  background: var(--pine);
+  border-color: var(--pine);
+}
+
+input.switch:checked::after {
+  transform: translateX(18px);
+  border-color: transparent;
+}
+
+input.switch:focus-visible {
+  outline: 2px solid var(--pine);
+  outline-offset: 2px;
+}
+
+.presence-status {
+  margin: 12px 0 0;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--ink-3);
+}
+
+/* --------------------------------------------------------------------------
+   13. MOTION UTILITIES
+   -------------------------------------------------------------------------- */
+
+.rise-in {
+  animation: rise-in var(--dur-3) var(--ease-out) both;
+}
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   12. ACTIVITY — FLAT QUEST ROWS
+   The panel is the surface; rows are separated by hairlines, not nested cards.
+   -------------------------------------------------------------------------- */
+
+#view-climb #climb-quests-list > div {
+  background: transparent !important;
+  border: 0 !important;
+  border-top: 1px solid var(--line) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 14px 0 !important;
+}
+
+#view-climb #climb-quests-list > div:first-child {
+  border-top: 0 !important;
+  padding-top: 4px !important;
+}
+
+#view-climb #climb-quests-list .h-2 {
+  height: 4px !important;
+  background: color-mix(in srgb, var(--pine) 12%, transparent) !important;
+}
+
+#view-climb #climb-quests-list .h-2 > div,
+#view-climb #climb-milestones-grid .h-1\.5 > div {
+  background-image: none !important;
+  background-color: var(--pine) !important;
+}
+
+#view-climb #climb-quests-list .quest-claim-btn {
+  height: 26px;
+  padding: 0 11px;
+  border-radius: 8px;
+  font-size: 10.5px;
+  letter-spacing: 0;
+}
+
+#view-climb #climb-milestones-grid .ms-claim-btn {
+  height: 23px;
+  padding: 0 9px;
+  border-radius: 7px;
+  font-size: 10px;
+  letter-spacing: 0;
+}
+
+/* --------------------------------------------------------------------------
+   13. COLLECTION — COSMETICS SHELF
+   -------------------------------------------------------------------------- */
+
+.cosmetic-shop .panel-head {
+  margin-bottom: 4px;
+}
+
+.shop-note {
+  margin: 0 0 14px;
+  font-size: 11.5px;
+  line-height: 1.55;
+  color: var(--ink-3);
+  max-width: 54ch;
+}
+
+.cosmetic-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border-radius: 14px;
+  background: var(--paper-deep);
+  border: 1px solid var(--line);
+}
+
+.cos-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 7px 4px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: var(--ink-3);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  transition: background 0.2s var(--ease-out), color 0.2s var(--ease-out),
+    box-shadow 0.2s var(--ease-out);
+}
+
+.cos-tab:hover {
+  color: var(--ink);
+}
+
+.cos-tab.is-active {
+  background: var(--surface);
+  color: var(--pine);
+  box-shadow: 0 1px 2px rgba(14, 32, 25, 0.1),
+    0 4px 10px -6px rgba(14, 32, 25, 0.28);
+}
+
+.cos-tab-count {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: var(--ink-3);
+}
+
+.cos-tab.is-active .cos-tab-count {
+  color: var(--pine);
+  opacity: 0.7;
+}
+
+.shop-slot-note {
+  margin: 10px 0 12px;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.cosmetic-shelf {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+@media (min-width: 760px) {
+  .cosmetic-shelf {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.cos-card {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  overflow: hidden;
+  background: var(--surface);
+  transition: transform 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out),
+    border-color 0.2s var(--ease-out);
+}
+
+.cos-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--line-strong);
+  box-shadow: 0 12px 24px -16px rgba(12, 34, 26, 0.5);
+}
+
+.cos-card.is-equipped {
+  border-color: color-mix(in srgb, var(--pine) 42%, var(--line));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--pine) 20%, transparent) inset;
+}
+
+.cos-stage {
+  position: relative;
+  height: 92px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  background: radial-gradient(90% 120% at 50% 0%, #17281f 0%, #0b1411 62%, #070d0b 100%);
+}
+
+.cos-stage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 3px 3px;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+.cos-stage--flat {
+  background: linear-gradient(180deg, #17281f, #0b1411);
+}
+
+.cos-disc {
+  position: relative;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 2px solid;
+  display: grid;
+  place-items: center;
+}
+
+.cos-star {
+  width: 19px;
+  height: 19px;
+}
+
+.cos-core {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.35);
+}
+
+.cos-line {
+  display: block;
+  width: 64%;
+  height: var(--thick, 3px);
+  border-radius: 999px;
+  background: var(--line, #14b8a6);
+  opacity: var(--opacity, 0.7);
+}
+
+.cos-line.is-dashed {
+  background: repeating-linear-gradient(90deg, var(--line) 0 4px, transparent 4px 9px);
+}
+
+.cos-ring {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  border: 1.5px solid;
+  border-radius: 999px;
+}
+
+.cos-ring--inner {
+  width: 34px;
+  height: 34px;
+  border-style: dotted;
+  opacity: 0.5;
+}
+
+.cos-stage--aura .cos-token {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 34% 26%, #1f7460, #0b4f3f 62%, #06362a);
+  border: 2px solid rgba(255, 255, 255, 0.85);
+}
+
+.cos-dots i {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--aura, #7fc3a8);
+  box-shadow: 0 0 6px var(--aura, #7fc3a8);
+  animation: cos-twinkle 2.8s ease-in-out infinite;
+}
+
+.cos-dots i:nth-child(1) { transform: translate(-50%, -50%) rotate(0deg) translateY(-27px); animation-delay: 0s; }
+.cos-dots i:nth-child(2) { transform: translate(-50%, -50%) rotate(90deg) translateY(-27px); animation-delay: 0.7s; }
+.cos-dots i:nth-child(3) { transform: translate(-50%, -50%) rotate(180deg) translateY(-27px); animation-delay: 1.4s; }
+.cos-dots i:nth-child(4) { transform: translate(-50%, -50%) rotate(270deg) translateY(-27px); animation-delay: 2.1s; }
+
+@keyframes cos-twinkle {
+  0%, 100% { opacity: 0.35; }
+  50%      { opacity: 1; }
+}
+
+.cos-meta {
+  padding: 11px 12px 8px;
+}
+
+.cos-rarity {
+  display: block;
+  margin-bottom: 3px;
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.cos-rarity--rare { color: var(--sky); }
+.cos-rarity--signature { color: var(--ember); }
+
+.cos-meta h4 {
+  margin: 0 0 3px;
+  font-size: 13.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.cos-meta p {
+  margin: 0;
+  min-height: 30px;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--ink-3);
+}
+
+.cos-foot {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 9px 12px;
+  border-top: 1px solid var(--line);
+}
+
+.cos-price {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 500;
+  color: var(--ink-2);
+}
+
+.cos-price.is-short {
+  color: var(--ember);
+}
+
+.cos-action {
+  height: 26px;
+  padding: 0 13px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--pine);
+  color: var(--surface);
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: 0;
+  transition: background 0.16s var(--ease-out), transform 0.16s var(--ease-out);
+}
+
+.cos-action:hover {
+  background: var(--pine-deep);
+}
+
+.cos-action:active {
+  transform: scale(0.95);
+}
+
+.cos-action.is-short {
+  background: transparent;
+  border: 1px solid var(--line-strong);
+  color: var(--pine);
+}
+
+.cos-worn {
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--pine-soft);
+  color: var(--pine);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+html.theme-dark .cos-action {
+  color: #08130f;
+}
+
+html.theme-dark .cos-action.is-short {
+  color: var(--pine);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}

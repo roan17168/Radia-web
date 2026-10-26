@@ -1,0 +1,632 @@
+/* ==========================================================================
+   RADIA — THE VOID (css/void.css)
+   --------------------------------------------------------------------------
+   The insight graph is the one place in the product allowed to be dark. It is
+   a sky, not a dashboard: three large reason-stars, quiet orbiting insights,
+   and a single sheet that speaks only when a star is chosen.
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   1. HEADER
+   -------------------------------------------------------------------------- */
+
+.insights-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 26px 18px 14px;
+}
+
+.insights-header .eyebrow {
+  display: block;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--pine);
+  margin-bottom: 4px;
+}
+
+.insights-header h1 {
+  font-family: var(--font-display);
+  font-size: clamp(24px, 6vw, 32px);
+  font-weight: 500;
+  letter-spacing: -0.025em;
+  line-height: 1.05;
+  color: var(--ink);
+  margin: 0;
+}
+
+.insights-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 4px;
+}
+
+.insights-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+
+.insights-meter-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--pine);
+  opacity: 0.55;
+}
+
+.insights-menu-wrap {
+  position: relative;
+}
+
+.insights-icon-btn {
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+}
+
+.insights-icon-btn:active {
+  transform: scale(0.96);
+}
+
+.insights-menu {
+  position: absolute;
+  top: 38px;
+  right: 0;
+  z-index: 30;
+  width: 176px;
+  padding: 5px;
+  border-radius: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--sh-3);
+  display: flex;
+  flex-direction: column;
+}
+
+.insights-menu.hidden {
+  display: none;
+}
+
+.insights-menu button {
+  text-align: left;
+  padding: 8px 10px;
+  border-radius: 9px;
+  font-size: 12px;
+  color: var(--ink-2);
+  background: transparent;
+}
+
+.insights-menu button:hover {
+  background: var(--surface-2);
+  color: var(--ink);
+}
+
+/* --------------------------------------------------------------------------
+   2. EMPTY STATE
+   -------------------------------------------------------------------------- */
+
+.insights-empty {
+  margin: 4px 16px 18px;
+  padding: 34px 22px 28px;
+  border-radius: 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  text-align: center;
+}
+
+/* Empty sky: the message sits in the void, between the stars and the caption. */
+.insights-empty--overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  margin: 0;
+  padding: 0 26px 54px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  pointer-events: none;
+  animation: sheet-rise 0.5s var(--ease-out) both;
+}
+
+.insights-empty--overlay.hidden {
+  display: none;
+}
+
+.insights-empty--overlay .insights-empty-cta {
+  pointer-events: auto;
+}
+
+.insights-empty--overlay .insights-empty-mark span {
+  background: #e8f0ea;
+}
+
+.insights-empty--overlay h2 {
+  font-family: var(--font-display);
+  color: #f2f6f2;
+  font-size: 21px;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  margin: 0 0 6px;
+}
+
+.insights-empty--overlay p {
+  color: rgba(232, 240, 234, 0.5);
+  font-size: 12px;
+  max-width: 30ch;
+  margin: 0 auto 16px;
+}
+
+.insights-empty--overlay .insights-empty-cta {
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: rgba(232, 240, 234, 0.1);
+  border: 1px solid rgba(232, 240, 234, 0.22);
+  color: #f2f6f2;
+  font-size: 11.5px;
+  font-weight: 600;
+  transition: background 0.18s ease, border-color 0.18s ease;
+}
+
+.insights-empty--overlay .insights-empty-cta:hover {
+  background: rgba(232, 240, 234, 0.18);
+}
+
+/* An empty sky has nothing to frame, so the caption and zoom get out of it. */
+.sky-empty .void-caption,
+.sky-empty .graph-zoom-controls {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.insights-empty.hidden {
+  display: none;
+}
+
+.insights-empty-mark {
+  display: flex;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.insights-empty-mark span {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: var(--pine);
+  opacity: 0.25;
+}
+
+.insights-empty-mark span:nth-child(2) {
+  width: 10px;
+  height: 10px;
+  opacity: 0.55;
+  margin-top: -2px;
+}
+
+.insights-empty h2 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  margin: 0 0 6px;
+}
+
+.insights-empty p {
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--ink-3);
+  max-width: 260px;
+  margin: 0 auto 18px;
+}
+
+.insights-empty-cta {
+  height: 36px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--pine);
+  color: var(--surface);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+html.theme-dark .insights-empty-cta {
+  color: #08130f;
+}
+
+/* --------------------------------------------------------------------------
+   3. THE VOID
+   -------------------------------------------------------------------------- */
+
+.void-card {
+  margin: 0 14px;
+  border-radius: 26px;
+  overflow: hidden;
+  background: #0a1210;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 18px 48px rgba(6, 14, 11, 0.35);
+}
+
+.void-stage {
+  position: relative;
+  height: clamp(360px, 58vh, 520px);
+  background:
+    radial-gradient(90% 70% at 50% 0%, #163028 0%, #0c1714 45%, #070d0b 100%);
+  border: none;
+  border-radius: 0;
+  overflow: hidden;
+}
+
+.void-stage::before {
+  /* faint grain so the dark field does not band */
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.35;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 3px 3px;
+}
+
+html.theme-dark .void-card {
+  background: #070d0b;
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+html.theme-dark .void-stage {
+  background: radial-gradient(90% 70% at 50% 0%, #10231c 0%, #0a1411 46%, #050a08 100%);
+}
+
+html.theme-dark .void-stage::before {
+  opacity: 0.16;
+}
+
+.void-stage canvas {
+  position: relative;
+  z-index: 1;
+  display: block;
+  width: 100%;
+  height: 100%;
+  touch-action: none;
+  cursor: grab;
+}
+
+.void-caption {
+  position: absolute;
+  left: 18px;
+  bottom: 14px;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(232, 240, 234, 0.42);
+  pointer-events: none;
+}
+
+.void-caption-sep {
+  width: 2px;
+  height: 2px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.void-stage .graph-zoom-controls {
+  z-index: 4;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  padding: 3px;
+  box-shadow: none;
+  backdrop-filter: blur(8px);
+}
+
+.void-stage .graph-zoom-controls button {
+  min-width: 26px;
+  height: 24px;
+  padding: 0 7px;
+  border-radius: 999px;
+  border: none;
+  background: transparent;
+  color: rgba(232, 240, 234, 0.72);
+  font-size: 10.5px;
+  font-weight: 500;
+}
+
+.void-stage .graph-zoom-controls button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+#constellation-hover-tooltip {
+  position: absolute;
+  z-index: 5;
+  padding: 6px 9px;
+  border-radius: 8px;
+  background: rgba(8, 16, 13, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: #e8f0ea;
+  font-size: 11px;
+  line-height: 1.3;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+  max-width: 190px;
+}
+
+#constellation-hover-tooltip.visible {
+  opacity: 1;
+}
+
+/* --------------------------------------------------------------------------
+   4. SELECTED NODE SHEET
+   -------------------------------------------------------------------------- */
+
+.void-sheet {
+  padding: 16px 18px 18px;
+  background: #0a1210;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  color: #e8f0ea;
+  animation: sheet-rise 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.void-sheet.hidden {
+  display: none;
+}
+
+@keyframes sheet-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.void-sheet-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 9.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(232, 240, 234, 0.45);
+  margin-bottom: 8px;
+}
+
+.void-sheet h3 {
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+  margin: 0 0 10px;
+  color: #f2f6f2;
+}
+
+.void-sheet .void-pair {
+  display: grid;
+  gap: 10px;
+}
+
+.void-sheet .void-quote {
+  font-size: 12px;
+  line-height: 1.55;
+  color: rgba(232, 240, 234, 0.78);
+  border-left: 2px solid rgba(127, 195, 168, 0.5);
+  padding-left: 10px;
+}
+
+.void-sheet .void-quote span {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(232, 240, 234, 0.4);
+  margin-bottom: 3px;
+}
+
+.void-sheet-close {
+  position: absolute;
+  right: 14px;
+  top: 14px;
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.07);
+  color: rgba(232, 240, 234, 0.7);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.void-sheet {
+  position: relative;
+}
+
+/* --------------------------------------------------------------------------
+   5. JOURNAL (secondary, collapsed)
+   -------------------------------------------------------------------------- */
+
+.journal-block {
+  margin: 22px 16px 8px;
+}
+
+.journal-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 14px 2px;
+  border-top: 1px solid var(--line);
+  color: var(--ink-2);
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.journal-toggle-left,
+.journal-toggle-right {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.journal-toggle-right {
+  color: var(--ink-3);
+  font-weight: 500;
+  font-size: 11.5px;
+}
+
+.journal-chevron {
+  transition: transform 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.journal-toggle[aria-expanded='true'] .journal-chevron {
+  transform: rotate(180deg);
+}
+
+.journal-panel {
+  padding: 4px 0 8px;
+  animation: sheet-rise 0.22s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.journal-panel.hidden {
+  display: none;
+}
+
+.journal-search {
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.journal-filters {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: 10px 0 12px;
+  scrollbar-width: none;
+}
+
+.journal-filters::-webkit-scrollbar {
+  display: none;
+}
+
+.journal-filter-btn {
+  flex-shrink: 0;
+  height: 29px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-3);
+  font-size: 11px;
+  font-weight: 500;
+  white-space: nowrap;
+  transition: background 0.16s var(--ease-out), color 0.16s var(--ease-out),
+    border-color 0.16s var(--ease-out);
+}
+
+.journal-filter-btn:hover {
+  color: var(--ink);
+  border-color: var(--line-strong);
+}
+
+.journal-filter-btn.is-active,
+.journal-filter-btn.btn-emerald {
+  background: var(--pine-soft) !important;
+  border-color: transparent !important;
+  color: var(--pine) !important;
+  font-weight: 600;
+}
+
+html.theme-dark .journal-filter-btn.is-active,
+html.theme-dark .journal-filter-btn.btn-emerald {
+  color: var(--pine) !important;
+}
+
+.journal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* The sky is the page: let the card take the height the screen has to give. */
+#view-reflections {
+  display: flex;
+  flex-direction: column;
+}
+
+#view-reflections .void-card {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 430px;
+}
+
+#view-reflections .void-stage {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 360px;
+}
+
+@media (max-width: 719px) {
+  #view-reflections .void-card {
+    min-height: 400px;
+  }
+  #view-reflections .void-stage {
+    min-height: 320px;
+  }
+  .insights-header {
+    padding: 20px 16px 10px;
+  }
+  .void-card {
+    margin: 0 12px;
+  }
+}
+
+/* The long-form synthesis lives in the data, not on the page. Three reason
+   stars are the visible summary; the essay belongs behind an export. */
+#ai-meta-insight-container {
+  display: none !important;
+}
+
+/* The theme's ID-scoped inspector would otherwise force a light card */
+#constellation-node-inspector.void-sheet {
+  background: #0a1210;
+  border: none;
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 0;
+}

@@ -10,7 +10,7 @@
   <!-- Google Fonts: Plus Jakarta Sans, Newsreader, JetBrains Mono -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;0,6..72,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
@@ -25,7 +25,10 @@
   <!-- Radia Custom Stylesheets -->
   <link rel="stylesheet" href="css/main.css" />
   <link rel="stylesheet" href="css/radar.css" />
+  <link rel="stylesheet" href="css/radar-v2.css" />
   <link rel="stylesheet" href="css/encounter.css" />
+  <link rel="stylesheet" href="css/theme.css" />
+  <link rel="stylesheet" href="css/void.css" />
 </head>
 <body class="overflow-hidden select-none">
 
@@ -45,271 +48,229 @@
     <!-- ===================================================================
          VIEW 1: EXPLORE WORLD MAP & ADAPTIVE PROXIMITY RADAR (DEFAULT)
          =================================================================== -->
-    <section id="view-radar" class="app-view active relative w-full h-full flex flex-col justify-between">
+    <section id="view-radar" class="app-view active relative w-full h-full overflow-hidden">
 
-      <!-- FULL-BLEED INTERACTIVE WORLD MAP STAGE -->
-      <div id="radar-world-stage" class="absolute inset-0 z-0" data-sprawl-zone="park_neighborhood">
-        <div id="leaflet-radar-map" class="w-full h-full"></div>
-        <!-- Lightweight non-blocking overlay for legacy hooks -->
-        <div id="proximity-circle-overlay" class="absolute inset-0 pointer-events-none"></div>
+      <!-- FULL-BLEED MAP STAGE -->
+      <div id="radar-world-stage" class="absolute inset-0 z-0">
+        <canvas id="radar-world-canvas" aria-hidden="true"></canvas>
+        <div id="leaflet-radar-map"></div>
+        <div id="proximity-circle-overlay" class="pointer-events-none"></div>
       </div>
 
-      <!-- TOP PERIPHERAL CORNER ORBS (POKÉMON GO OVERWORLD STYLE — ZERO WIDE BANNERS) -->
-      <header class="relative z-20 px-3 pt-2.5 flex items-start justify-between pointer-events-none w-full">
-        <!-- Top-Left: Compact Availability + Sprawl Micro-Capsule + Active Hotspot Pill -->
-        <div class="flex flex-col items-start gap-1.5">
-          <div class="glass-pill px-2.5 py-1 rounded-full flex items-center gap-2 pointer-events-auto">
-            <button id="btn-toggle-availability" type="button" class="flex items-center gap-1.5 text-left" title="Toggle Availability Status">
-              <span class="avail-dot w-2 h-2 rounded-full bg-teal-500 animate-pulse flex-shrink-0"></span>
-              <span id="label-availability" class="text-[11px] font-extrabold text-teal-700">Open</span>
-            </button>
-            <span class="text-slate-300 text-[10px]">|</span>
-            <button id="hud-btn-open-sprawl" type="button" class="flex items-center gap-1 text-[11px] font-mono-code font-bold text-slate-700 hover:text-teal-600 transition-colors" title="Calibrate Urban Sprawl Radius">
-              <i data-lucide="radar" class="w-3.5 h-3.5 text-teal-600"></i>
-              <span id="hud-sprawl-label">40ft</span>
-            </button>
-            <span id="hud-pace-readout" class="hidden md:inline text-[10px] font-mono-code text-slate-400 pl-1">40.7308°N, 73.9973°W</span>
-            <span id="bottom-sprawl-label" class="sr-only">Neighborhood Park • 40ft (12m)</span>
-          </div>
+      <!-- ============================ TOP BAR ============================ -->
+      <header class="radar-topbar">
+        <div class="radar-topbar-row">
+          <button id="btn-toggle-availability" type="button" class="radar-availability" title="Toggle whether you are open to a conversation">
+            <span class="avail-dot"></span>
+            <span id="label-availability">Open to talk</span>
+          </button>
 
-          <!-- Active Community Hub Multiplier Pill (Only Visible When Inside Hub Radius) -->
-          <div id="hotspot-badge" class="hidden glass-pill px-2.5 py-1 rounded-full flex items-center gap-1.5 text-[10.5px] font-bold text-amber-700 border-amber-500/40 pointer-events-auto">
-            <i data-lucide="flame" class="w-3.5 h-3.5 text-amber-600"></i>
-            <span id="hotspot-badge-text">Central Fountain Plaza (2x)</span>
+          <div class="radar-actions">
+            <button id="btn-toggle-map-layers" type="button" class="radar-icon-btn" aria-expanded="false" title="Map style and city">
+              <i data-lucide="layers" class="w-[18px] h-[18px]"></i>
+            </button>
+            <button id="btn-recenter-map" type="button" class="radar-icon-btn" title="Centre on me">
+              <i data-lucide="locate-fixed" class="w-[18px] h-[18px]"></i>
+            </button>
+            <button id="btn-open-quick-guide" type="button" class="radar-icon-btn" title="How Radia works">
+              <i data-lucide="help-circle" class="w-[18px] h-[18px]"></i>
+            </button>
           </div>
         </div>
 
-        <!-- Top-Right: Sleek Pokémon-GO Circular Corner Orbs + Dismissible Map Popover -->
-        <div class="relative flex flex-col items-end gap-2 pointer-events-auto">
-          <div class="flex items-center gap-1.5">
-            <button id="btn-toggle-map-layers" type="button" aria-expanded="false" class="glass-pill h-[38px] px-2.5 rounded-full flex items-center gap-1.5 text-xs font-bold text-slate-800 hover:border-teal-500/40 transition-all" title="World Map Layers &amp; City Quick-Jump">
-              <i data-lucide="compass" class="w-4 h-4 text-teal-600"></i>
-              <span id="map-layers-display-label" class="text-[11px] font-bold">NYC • Street</span>
-            </button>
+        <div class="radar-meta-row">
+          <button id="hud-btn-open-sprawl" type="button" class="radar-chip" title="Adjust your conversation radius">
+            <span class="radar-chip-dot"></span>
+            <span><span id="hud-sprawl-label">12 m</span> radius</span>
+          </button>
+          <span id="bottom-sprawl-label" class="sr-only">Neighborhood Park</span>
 
-            <button id="btn-recenter-map" type="button" class="pogo-corner-orb" title="Recenter Camera on Your Strider">
-              <i data-lucide="navigation" class="w-4 h-4 text-teal-600"></i>
-            </button>
+          <span id="hotspot-badge" class="hidden radar-chip radar-chip--amber">
+            <i data-lucide="sparkles" class="w-3 h-3"></i>
+            <span id="hotspot-badge-text"></span>
+          </span>
 
-            <button id="btn-toggle-appearance" type="button" class="pogo-corner-orb" aria-label="Toggle Daylight or Evening Mode" title="Switch Daylight / Evening Mode">
-              <i data-lucide="moon" class="w-4 h-4"></i>
-            </button>
+          <span id="hud-pace-readout" class="radar-coords"></span>
+        </div>
 
-            <button id="btn-audio-toggle" type="button" class="pogo-corner-orb" aria-label="Toggle Audio Chimes" title="Toggle Audio Chimes">
-              <i data-lucide="volume-2" class="w-4 h-4 text-teal-600"></i>
-            </button>
-
-            <button id="btn-open-quick-guide" type="button" class="pogo-corner-orb" aria-label="How Radia Works" title="Product Overview &amp; Guide">
-              <i data-lucide="help-circle" class="w-4 h-4"></i>
-            </button>
+        <!-- Map style / city popover -->
+        <div id="map-layers-popover" class="hidden radar-popover">
+          <div class="radar-popover-head">
+            <span>Map</span>
+            <span id="map-tile-status-pill" class="radar-tile-status">
+              <span class="w-2 h-2 rounded-full bg-teal-500"></span>
+              <span>Loading…</span>
+            </span>
           </div>
 
-          <!-- Dismissible Map & Cities Popover Card -->
-          <div id="map-layers-popover" class="hidden absolute right-0 top-11 z-40 glass-panel p-3.5 rounded-2xl w-72 sm:w-80 pointer-events-auto shadow-xl space-y-3">
-            <div class="flex items-center justify-between border-b border-slate-200 pb-2">
-              <span class="text-[11px] font-extrabold uppercase tracking-wider text-slate-800">World Map &amp; Cities</span>
-              <span id="map-tile-status-pill" class="inline-flex items-center gap-1.5 text-[10px] font-semibold text-teal-700">
-                <span class="w-2 h-2 rounded-full bg-teal-500"></span>
-                <span>Street &amp; Park • Live Map</span>
-              </span>
-            </div>
-
-            <div class="space-y-1.5">
-              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Map Repository Layer</span>
-              <div class="grid grid-cols-2 gap-1.5">
-                <button type="button" class="map-provider-btn btn-emerald px-2.5 py-1.5 rounded-xl text-[11px] font-bold" data-provider="voyager">Street &amp; Park</button>
-                <button type="button" class="map-provider-btn btn-glass px-2.5 py-1.5 rounded-xl text-[11px] font-semibold" data-provider="osm">OSM Detail</button>
-                <button type="button" class="map-provider-btn btn-glass px-2.5 py-1.5 rounded-xl text-[11px] font-semibold" data-provider="positron">Minimal Light</button>
-                <button type="button" class="map-provider-btn btn-glass px-2.5 py-1.5 rounded-xl text-[11px] font-semibold" data-provider="topo">Topographic</button>
-                <button type="button" class="map-provider-btn btn-glass px-2.5 py-1.5 rounded-xl text-[11px] font-semibold col-span-2" data-provider="dark">Evening Dark Matter</button>
-              </div>
-            </div>
-
-            <div class="space-y-1.5 pt-1 border-t border-slate-200">
-              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-500 block">Quick-Jump City / Live GPS</span>
-              <div class="grid grid-cols-3 gap-1.5">
-                <button type="button" class="city-jump-btn btn-glass px-2 py-1.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 text-teal-700" data-city="gps" title="Use Live Browser GPS">
-                  <i data-lucide="locate-fixed" class="w-3 h-3"></i>
-                  <span>GPS</span>
-                </button>
-                <button type="button" class="city-jump-btn btn-emerald px-2 py-1.5 rounded-xl text-[11px] font-semibold" data-city="nyc">NYC</button>
-                <button type="button" class="city-jump-btn btn-glass px-2 py-1.5 rounded-xl text-[11px] font-semibold" data-city="sf">SF</button>
-                <button type="button" class="city-jump-btn btn-glass px-2 py-1.5 rounded-xl text-[11px] font-semibold" data-city="london">London</button>
-                <button type="button" class="city-jump-btn btn-glass px-2 py-1.5 rounded-xl text-[11px] font-semibold" data-city="austin">Austin</button>
-                <button type="button" class="city-jump-btn btn-glass px-2 py-1.5 rounded-xl text-[11px] font-semibold" data-city="tokyo">Tokyo</button>
-              </div>
-            </div>
+          <span class="radar-popover-label">Style</span>
+          <div class="radar-option-grid">
+            <button type="button" class="map-provider-btn is-active" data-provider="voyager">Daylight</button>
+            <button type="button" class="map-provider-btn" data-provider="osm">Vivid</button>
+            <button type="button" class="map-provider-btn" data-provider="positron">Calm</button>
+            <button type="button" class="map-provider-btn" data-provider="topo">Terrain</button>
+            <button type="button" class="map-provider-btn" data-provider="dark">Evening</button>
           </div>
+
+          <span class="radar-popover-label">Preview a city</span>
+          <div class="radar-option-grid radar-option-grid--cities">
+            <button type="button" class="city-jump-btn" data-city="gps"><i data-lucide="navigation" class="w-3 h-3"></i>Near me</button>
+            <button type="button" class="city-jump-btn" data-city="nyc">NYC</button>
+            <button type="button" class="city-jump-btn" data-city="sf">SF</button>
+            <button type="button" class="city-jump-btn" data-city="london">London</button>
+            <button type="button" class="city-jump-btn" data-city="austin">Austin</button>
+            <button type="button" class="city-jump-btn" data-city="tokyo">Tokyo</button>
+          </div>
+
+          <p class="radar-popover-note">
+            <span id="map-layers-display-label">NYC · Daylight</span> — tiles need no API key.
+          </p>
         </div>
       </header>
 
-      <!-- BOTTOM POKÉMON-GO OVERWORLD PERIPHERAL HUD (TRAINER MEDALLION, CENTER ORB, NEARBY TRACKER) -->
-      <div class="relative z-20 px-3 pb-20 flex flex-col items-center gap-2 pointer-events-none w-full">
+      <!-- ======================== HONEST EMPTY STATE ===================== -->
+      <div id="radar-empty-state" class="radar-empty">
+        <div class="radar-empty-card">
+          <span class="radar-eyebrow">Your radius is quiet</span>
+          <h2>No one is here yet.</h2>
+          <p>Radia only ever shows real people who are physically close to you. Nothing is simulated.</p>
+          <div class="radar-empty-actions">
+            <button id="btn-empty-locate" type="button" class="radar-btn radar-btn--primary">Use my location</button>
+            <button id="btn-empty-widen" type="button" class="radar-btn">Widen radius</button>
+            <button id="btn-empty-help" type="button" class="radar-btn hidden">How it works</button>
+          </div>
+        </div>
+      </div>
 
-        <!-- Interactive Map Entity & Nearby Inspector Popover (Only Visible When Tapped) -->
-        <div id="map-entity-inspector" class="hidden glass-panel p-3.5 rounded-2xl w-full max-w-md pointer-events-auto shadow-xl"></div>
+      <!-- ====================== BOTTOM STATUS STRIP ====================== -->
+      <div class="radar-bottombar">
+        <div id="map-entity-inspector" class="hidden radar-inspector"></div>
 
-        <!-- Corner-Anchored Peripheral Row (Leaves Map Center 100% Open) -->
-        <div class="w-full flex items-end justify-between gap-2">
-
-          <!-- Bottom-Left: Pokémon GO Trainer / Explorer Profile Medallion -->
-          <button id="hud-btn-open-climb" type="button" class="pogo-trainer-medallion pointer-events-auto text-left" title="Open Explorer Activity &amp; Milestones">
-            <div class="pogo-trainer-avatar-ring">
-              <div class="pogo-trainer-avatar-inner">
-                <svg viewBox="0 0 32 32" class="w-7 h-7" aria-hidden="true">
-                  <circle cx="16" cy="12" r="6" fill="#fde68a" />
-                  <rect x="11" y="9.8" width="10" height="3.4" rx="1.7" fill="#0f172a" stroke="#5eead4" stroke-width="0.9" />
-                  <path d="M9.5 11.5C9.5 7 12.5 4.5 16.5 4.5C20 4.5 22.8 6.6 23 10C21 8.5 18.5 8 15.5 8.2C12.8 8.4 10.8 9.6 9.5 11.5Z" fill="#0f172a" />
-                  <path d="M8 28C8 21.5 24 21.5 24 28Z" fill="#0d9488" />
-                </svg>
-              </div>
-            </div>
-            <div class="flex flex-col leading-tight pr-1">
-              <span id="header-user-level" class="text-[10.5px] font-extrabold text-slate-900">Tier 2</span>
-              <div class="flex items-center gap-1 text-[10px] font-mono-code">
-                <span id="header-lumina-count" class="text-amber-700 font-bold">145</span>
-                <span class="text-slate-300">•</span>
-                <span id="header-user-distance" class="text-teal-700 font-bold">0.34 km</span>
-              </div>
-            </div>
+        <div class="radar-status-row">
+          <button id="btn-track-walk" type="button" class="radar-chip radar-chip--action" title="Start recording a walk">
+            <i data-lucide="footprints" class="w-4 h-4"></i>
+            <span id="walk-status-label">Start walk</span>
+            <span class="radar-chip-divider"></span>
+            <span class="radar-credits"><span id="header-lumina-count">0</span> cr</span>
           </button>
 
-          <!-- Bottom-Center: Sleek Poké-Orb Action Cluster (Walk • Central Connect Orb • Spin Hub) -->
-          <div class="flex items-center gap-2 pointer-events-auto">
-            <button id="btn-toggle-sim-walk" type="button" class="glass-pill h-10 px-3 rounded-full flex items-center gap-1.5 text-xs font-bold text-slate-800" title="Toggle Continuous Auto-Walk">
-              <i data-lucide="footprints" class="w-4 h-4 text-teal-600"></i>
-              <span class="hidden sm:inline">Auto-Walk</span>
-            </button>
-
-            <button id="btn-simulate-collision" type="button" class="pogo-central-pulse-orb" title="Ping Radar &amp; Connect with Nearby Neighbor">
-              <i data-lucide="radio" class="w-5 h-5"></i>
-              <span class="sr-only">Connect</span>
-            </button>
-
-            <button id="btn-harvest-spot" type="button" class="glass-pill h-10 px-3 rounded-full flex items-center gap-1.5 text-xs font-bold text-slate-800" title="Spin / Check In at Nearest Community Hub">
-              <i data-lucide="sparkles" class="w-4 h-4 text-amber-500"></i>
-              <span class="hidden sm:inline">Spin Hub</span>
-            </button>
-          </div>
-
-          <!-- Bottom-Right: Pokémon GO "Nearby" Radar Capsule -->
-          <div class="flex items-center gap-1.5 pointer-events-auto">
-            <button id="btn-open-sprawl-sheet" type="button" class="pogo-corner-orb" title="Calibrate Sprawl Bubble">
-              <i data-lucide="sliders-horizontal" class="w-4 h-4 text-teal-600"></i>
-            </button>
-            <button id="btn-open-nearby-drawer" type="button" class="glass-pill h-10 px-3 rounded-full flex items-center gap-2 text-xs font-bold text-slate-800" title="Open Nearby Explorers &amp; Wayspots Radar">
-              <div class="flex -space-x-1.5 overflow-hidden">
-                <span class="inline-block w-4 h-4 rounded-full bg-teal-600 ring-1 ring-white"></span>
-                <span class="inline-block w-4 h-4 rounded-full bg-sky-600 ring-1 ring-white"></span>
-                <span class="inline-block w-4 h-4 rounded-full bg-amber-500 ring-1 ring-white"></span>
-              </div>
-              <span id="nearby-member-count-text" class="text-[11px] font-mono-code font-bold text-teal-700">4 nearby</span>
-            </button>
-          </div>
-
+          <button id="btn-open-nearby-drawer" type="button" class="radar-chip" title="People and places inside your radius">
+            <i data-lucide="users" class="w-4 h-4"></i>
+            <span id="nearby-member-count-text">0 nearby</span>
+          </button>
         </div>
+
+        <div class="radar-attribution">
+          <span id="map-attribution-text">© OpenStreetMap contributors</span>
+        </div>
+      </div>
+
+      <!-- Demo-only controls: never shown in the consumer experience -->
+      <div id="radar-demo-controls" class="hidden" aria-hidden="true">
+        <span id="header-user-level">Tier 1</span>
+        <span id="header-user-distance">0.00 km</span>
+        <button id="hud-btn-open-climb" type="button">Activity</button>
+        <button id="btn-toggle-sim-walk" type="button">Auto-walk</button>
+        <button id="btn-simulate-collision" type="button">Ping</button>
+        <button id="btn-harvest-spot" type="button">Check in</button>
+        <button id="btn-open-sprawl-sheet" type="button">Radius</button>
+        <button id="btn-audio-toggle" type="button">Audio</button>
       </div>
     </section>
 
     <!-- ===================================================================
          VIEW 2: INSIGHT NETWORK GRAPH & AI REFLECTION SYNTHESIS
          =================================================================== -->
-    <section id="view-reflections" class="app-view relative w-full h-full overflow-y-auto px-4 pt-6 pb-28 max-w-4xl mx-auto space-y-5">
+    <section id="view-reflections" class="app-view relative w-full h-full overflow-y-auto pb-28 max-w-4xl mx-auto">
 
-      <!-- Header -->
-      <header class="flex flex-wrap items-center justify-between gap-3">
+      <!-- Minimal header: the graph is the page, not a card inside a wall of controls -->
+      <header class="insights-header">
         <div>
-          <span class="text-[11px] font-bold uppercase tracking-wider text-teal-700">Post-Dialogue Knowledge Graph</span>
-          <h1 class="text-xl font-extrabold tracking-tight text-slate-900">Insight Network &amp; Growth Tree</h1>
-          <p class="text-xs text-slate-500">Every mutual insight is anchored to its conversation prompt and neighborhood hub, synthesizing how you evolve and your impact on people around you.</p>
+          <span class="eyebrow">Insight graph</span>
+          <h1>Your constellation</h1>
         </div>
 
-        <div class="flex flex-wrap items-center gap-2">
-          <span id="insight-same-mile-pill" class="px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/35 text-[10px] font-bold text-amber-700">
-            Same-Mile Cluster: 4 / 10 in 1 Mi
+        <div class="insights-header-actions">
+          <span id="insight-same-mile-pill" class="insights-meter" title="Insights recorded within one mile">
+            <span class="insights-meter-dot"></span>
+            <span id="insight-same-mile-count">0</span>/10 in a mile
           </span>
-          <button id="btn-plant-sample-insight" type="button" class="btn-emerald px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-bold">
-            <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
-            <span>Log Sample Insight</span>
-          </button>
-          <button id="btn-export-reflections" type="button" class="btn-glass px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-bold text-slate-700">
-            <i data-lucide="download" class="w-3.5 h-3.5 text-teal-600"></i>
-            <span>Export (.md)</span>
-          </button>
-          <button id="btn-export-reflections-json" type="button" class="btn-glass px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-bold text-slate-700">
-            <i data-lucide="file-json" class="w-3.5 h-3.5 text-amber-600"></i>
-            <span>Export (.json)</span>
-          </button>
+
+          <div class="insights-menu-wrap">
+            <button id="btn-insights-menu" type="button" class="insights-icon-btn" aria-label="Insight actions" aria-expanded="false">
+              <i data-lucide="more-horizontal" class="w-[18px] h-[18px]"></i>
+            </button>
+            <div id="insights-menu" class="insights-menu hidden">
+              <button id="btn-plant-sample-insight" type="button" data-demo-only>Log sample insight</button>
+              <button id="btn-export-reflections" type="button">Export markdown</button>
+              <button id="btn-export-reflections-json" type="button">Export JSON</button>
+            </div>
+          </div>
         </div>
       </header>
 
-      <!-- Interactive Graph Canvas Card -->
-      <div class="glass-panel p-4 rounded-3xl space-y-3">
-        <!-- Mode Switcher Bar -->
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div class="flex items-center gap-1.5">
-            <button type="button" class="constellation-mode-btn btn-emerald px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5" data-graph-mode="tree">
-              <i data-lucide="git-branch" class="w-3.5 h-3.5"></i>
-              <span>Growth Tree</span>
-            </button>
-            <button type="button" class="constellation-mode-btn btn-glass px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5" data-graph-mode="constellation">
-              <i data-lucide="share-2" class="w-3.5 h-3.5"></i>
-              <span>Network Graph</span>
-            </button>
-            <button type="button" class="constellation-mode-btn btn-glass px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5" data-graph-mode="spatial">
-              <i data-lucide="map" class="w-3.5 h-3.5"></i>
-              <span>1-Mile Spatial Map</span>
-            </button>
-          </div>
-
-          <div class="flex items-center gap-3 text-[11px] text-slate-500">
-            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-teal-600 inline-block"></span> Your Insight</span>
-            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-violet-600 inline-block"></span> Partner Insight</span>
-            <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-amber-500 inline-block"></span> AI Synthesis</span>
-          </div>
-        </div>
-
-        <!-- Interactive HTML5 Canvas with Pan, Zoom & Hover Tooltip -->
-        <div class="constellation-stage">
+      <!-- The void -->
+      <div id="insight-graph-card" class="void-card">
+        <div class="constellation-stage void-stage">
           <canvas id="insight-constellation-canvas"></canvas>
           <div id="constellation-hover-tooltip"></div>
+
+          <!-- Honest zero state, inside the sky rather than above it -->
+          <div id="insight-empty-state" class="hidden insights-empty insights-empty--overlay">
+            <h2>Nothing has been said yet.</h2>
+            <p>Your first conversation plants the first star.</p>
+            <button id="btn-insight-empty-map" type="button" class="insights-empty-cta">Back to the map</button>
+          </div>
+
+          <div class="void-caption">
+            <span id="void-count">0 stars</span>
+            <span class="void-caption-sep"></span>
+            <span>Tap one to read it</span>
+          </div>
+
           <div class="graph-zoom-controls">
-            <button id="btn-graph-zoom-out" type="button" class="btn-glass px-2 py-1 rounded-lg text-xs font-bold" title="Zoom Out">−</button>
-            <button id="btn-graph-zoom-reset" type="button" class="btn-glass px-2 py-1 rounded-lg text-[10px] font-bold" title="Reset View">Reset</button>
-            <button id="btn-graph-zoom-in" type="button" class="btn-glass px-2 py-1 rounded-lg text-xs font-bold" title="Zoom In">+</button>
-            <button id="btn-expand-constellation" type="button" class="btn-glass px-2 py-1 rounded-lg text-[10px] font-bold" title="Expand Stage Height">Expand</button>
+            <button id="btn-graph-zoom-out" type="button" title="Zoom out">−</button>
+            <button id="btn-graph-zoom-reset" type="button" title="Reset view">Reset</button>
+            <button id="btn-graph-zoom-in" type="button" title="Zoom in">+</button>
+            <button id="btn-expand-constellation" type="button" title="Expand">⤢</button>
           </div>
         </div>
 
-        <!-- Selected Node / AI Pillar Inspector -->
-        <div id="constellation-node-inspector" class="p-4 rounded-2xl bg-slate-100/80 border border-slate-200">
-          <p class="text-xs text-slate-500">Select any insight node or AI synthesis pillar above to inspect the prompt, location hub, and mutual takeaways.</p>
-        </div>
+        <!-- Only the selected node speaks, and only what matters -->
+        <div id="constellation-node-inspector" class="void-sheet hidden"></div>
       </div>
 
-      <!-- AI Reflection Synthesis (3 Pillars: Changed, Learned, Effect on Others) -->
-      <div id="ai-meta-insight-container"></div>
+      <!-- Long-form synthesis stays available, never in the way -->
+      <div id="ai-meta-insight-container" class="hidden"></div>
 
-      <!-- Encrypted Vault Journal List with Search & Category Filter Bar -->
-      <div class="space-y-3">
-        <div class="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 class="text-sm font-extrabold uppercase tracking-wider text-slate-700">Mutual Insight Log &amp; Encrypted Notes</h2>
-            <span id="journal-filtered-count" class="text-[11px] font-mono-code text-slate-500">6 Insights • AES-256-GCM Local Vault</span>
+      <!-- Journal is secondary: a quiet disclosure under the sky -->
+      <div class="journal-block">
+        <button id="btn-toggle-journal" type="button" class="journal-toggle" aria-expanded="false">
+          <span class="journal-toggle-left">
+            <i data-lucide="book-open" class="w-4 h-4"></i>
+            Journal
+          </span>
+          <span class="journal-toggle-right">
+            <span id="journal-filtered-count">0 insights</span>
+            <i data-lucide="chevron-down" class="w-4 h-4 journal-chevron"></i>
+          </span>
+        </button>
+
+        <div id="journal-panel" class="hidden journal-panel">
+          <input id="input-search-insights" type="search" placeholder="Search people, places, words" class="journal-search" />
+
+          <div class="journal-filters">
+            <button type="button" class="journal-filter-btn is-active" data-filter="all">All</button>
+            <button type="button" class="journal-filter-btn" data-filter="vuln">Vulnerability</button>
+            <button type="button" class="journal-filter-btn" data-filter="obs">Observations</button>
+            <button type="button" class="journal-filter-btn" data-filter="cur">Curiosity</button>
+            <button type="button" class="journal-filter-btn" data-filter="mutual">Mutual</button>
           </div>
-          <input id="input-search-insights" type="search" placeholder="Search partner, hub, or keyword..." class="px-3 py-1.5 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-teal-600 w-full sm:w-64" />
-        </div>
 
-        <div class="flex flex-wrap items-center gap-1.5">
-          <button type="button" class="journal-filter-btn btn-emerald px-2.5 py-1 rounded-full text-[11px] font-bold" data-filter="all">All Insights</button>
-          <button type="button" class="journal-filter-btn btn-glass px-2.5 py-1 rounded-full text-[11px] font-semibold" data-filter="vuln">Human &amp; Vulnerability</button>
-          <button type="button" class="journal-filter-btn btn-glass px-2.5 py-1 rounded-full text-[11px] font-semibold" data-filter="obs">Observational</button>
-          <button type="button" class="journal-filter-btn btn-glass px-2.5 py-1 rounded-full text-[11px] font-semibold" data-filter="cur">Curiosity</button>
-          <button type="button" class="journal-filter-btn btn-glass px-2.5 py-1 rounded-full text-[11px] font-semibold" data-filter="mutual">Mutual Matches</button>
+          <div id="reflections-list" class="journal-list"></div>
         </div>
-
-        <div id="reflections-list" class="space-y-3"></div>
       </div>
+
     </section>
 
     <!-- ===================================================================
@@ -317,112 +278,113 @@
          =================================================================== -->
     <section id="view-climb" class="app-view relative w-full h-full overflow-y-auto px-4 pt-6 pb-28 max-w-4xl mx-auto space-y-5">
 
-      <header class="flex flex-wrap items-center justify-between gap-3">
+      <header class="view-head">
         <div>
-          <span class="text-[11px] font-bold uppercase tracking-wider text-teal-700">Walking Telemetry &amp; Spatial Benchmarks</span>
-          <h1 class="text-xl font-extrabold tracking-tight text-slate-900">Activity &amp; Milestones</h1>
-          <p class="text-xs text-slate-500">Walking in your neighborhood and engaging in real-world dialogues earns Field Credits, unlocks distance milestones, and builds spatial correlation benchmarks.</p>
+          <span class="eyebrow">Activity</span>
+          <h1>Your standing</h1>
+          <p>Every walk and every real conversation compounds. Progress stays on this device.</p>
         </div>
 
-        <div class="flex items-center gap-2">
-          <button id="btn-climb-power-walk" type="button" class="btn-emerald px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-bold">
+        <div class="view-head-actions">
+          <button id="btn-climb-power-walk" type="button" data-demo-only class="btn-ghost-sm">
             <i data-lucide="footprints" class="w-3.5 h-3.5"></i>
-            <span>Log +200m Walk</span>
+            <span>Log 200 m</span>
           </button>
-          <button id="btn-climb-plant-mile" type="button" class="btn-amber px-3 py-1.5 rounded-xl flex items-center gap-1.5 text-xs font-bold">
+          <button id="btn-climb-plant-mile" type="button" data-demo-only class="btn-ghost-sm">
             <i data-lucide="map-pin" class="w-3.5 h-3.5"></i>
-            <span>+1 Same-Mile Insight</span>
+            <span>Same-mile insight</span>
           </button>
         </div>
       </header>
 
-      <!-- Member Tier & Telemetry Overview Card -->
-      <div class="glass-panel p-5 rounded-3xl space-y-4">
-        <div class="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <span class="text-[10px] font-bold uppercase tracking-wider text-teal-700">Current Member Standing</span>
-            <div class="flex items-center gap-2.5 mt-0.5">
-              <h2 id="climb-rank-title" class="text-xl font-extrabold text-slate-900">Neighborhood Explorer</h2>
-              <span id="climb-level-badge" class="px-2.5 py-0.5 rounded-full bg-teal-500/15 border border-teal-500/30 text-xs font-mono-code font-bold text-teal-700">Tier 2</span>
-            </div>
+      <section class="panel standing-panel">
+        <div class="standing-top">
+          <div class="standing-rank">
+            <span class="panel-label">Rank <span id="climb-level-badge" class="tier-chip">Tier 2</span></span>
+            <h2 id="climb-rank-title" class="rank-title">Neighborhood Explorer</h2>
           </div>
-
-          <div class="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-amber-500/10 border border-amber-500/30">
-            <i data-lucide="award" class="w-5 h-5 text-amber-600"></i>
-            <div>
-              <span class="text-[10px] font-bold uppercase tracking-wider text-amber-700 block">Field Credits</span>
-              <span id="climb-lumina-balance" class="text-base font-mono-code font-extrabold text-slate-900">145</span>
-            </div>
+          <div class="credits">
+            <span class="panel-label">Credits</span>
+            <span id="climb-lumina-balance" class="credits-value">0</span>
           </div>
         </div>
 
-        <!-- XP Bar -->
-        <div class="space-y-1.5">
-          <div class="w-full h-2.5 bg-slate-200 rounded-full overflow-hidden">
-            <div id="climb-xp-bar" class="h-full bg-gradient-to-r from-teal-600 to-amber-500 rounded-full transition-all duration-500" style="width: 45%"></div>
-          </div>
-          <div class="flex justify-between text-xs font-mono-code text-slate-500">
-            <span id="climb-current-xp">480 XP</span>
+        <div class="xp">
+          <div class="xp-track"><div id="climb-xp-bar" class="xp-fill" style="width: 0%"></div></div>
+          <div class="xp-meta">
+            <span id="climb-current-xp">0 XP</span>
             <span id="climb-target-xp">750 XP to Tier 3</span>
           </div>
         </div>
 
-        <!-- 4 Key Telemetry Counters -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 pt-1">
-          <div class="p-3 rounded-2xl bg-slate-100/80 border border-slate-200 flex flex-col justify-between">
-            <span class="text-[10px] font-bold uppercase text-slate-500 block">Dialogues</span>
-            <span id="stats-total-encounters" class="text-base font-mono-code font-extrabold text-slate-900 mt-1">4</span>
+        <dl class="stat-row">
+          <div class="stat">
+            <dt>Dialogues</dt>
+            <dd id="stats-total-encounters">0</dd>
           </div>
-          <div class="p-3 rounded-2xl bg-slate-100/80 border border-slate-200 flex flex-col justify-between">
-            <span class="text-[10px] font-bold uppercase text-slate-500 block">Distance Walked</span>
-            <span id="stats-total-distance" class="text-base font-mono-code font-extrabold text-teal-700 mt-1">0.34 km</span>
+          <div class="stat">
+            <dt>Distance</dt>
+            <dd id="stats-total-distance">0.00 km</dd>
           </div>
-          <div class="p-3 rounded-2xl bg-slate-100/80 border border-slate-200 flex flex-col justify-between">
-            <span class="text-[10px] font-bold uppercase text-slate-500 block">Same-Mile Cluster</span>
-            <span id="stats-same-mile-count" class="text-base font-mono-code font-extrabold text-amber-700 mt-1">4 / 10</span>
+          <div class="stat">
+            <dt>Same mile</dt>
+            <dd id="stats-same-mile-count">0 / 10</dd>
           </div>
-          <div class="p-3 rounded-2xl bg-slate-100/80 border border-slate-200 flex flex-col justify-between">
-            <span class="text-[10px] font-bold uppercase text-slate-500 block">Hub Check-Ins</span>
-            <span id="stats-spots-harvested" class="text-base font-mono-code font-extrabold text-slate-900 mt-1">1</span>
+          <div class="stat">
+            <dt>Check-ins</dt>
+            <dd id="stats-spots-harvested">0</dd>
           </div>
-        </div>
-      </div>
+        </dl>
+      </section>
 
-      <!-- Walking Distance Milestone Track -->
-      <div class="glass-panel p-5 rounded-3xl space-y-3">
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-sm font-extrabold text-slate-900">Walking Distance Benchmarks</h3>
-            <p class="text-xs text-slate-500">Tap anywhere on the map to walk or log steps with live GPS to unlock distance rewards.</p>
-          </div>
-          <span class="text-[11px] font-mono-code font-bold text-teal-700">+8 Credits / 25m</span>
+      <section class="panel progress-panel">
+        <div class="panel-head">
+          <h3>Today</h3>
+          <span class="panel-note">Resets at midnight</span>
+        </div>
+        <div id="climb-quests-list" class="quest-list"></div>
+
+        <div class="panel-split"></div>
+
+        <div class="panel-head">
+          <h3>Distance milestones</h3>
+          <span class="panel-note">8 credits per 25 m</span>
         </div>
         <div id="climb-milestones-grid" class="milestone-track-grid"></div>
-      </div>
+      </section>
 
-      <!-- Daily Activity Goals & Spatial Milestones -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="glass-panel p-5 rounded-3xl space-y-3">
-          <h3 class="text-sm font-extrabold text-slate-900">Daily Activity Goals</h3>
-          <div id="climb-quests-list" class="space-y-2.5"></div>
-        </div>
+      <div class="collection-block">
+        <button id="btn-toggle-collection" type="button" class="collection-toggle" aria-expanded="false">
+          <span class="collection-title">
+            <i data-lucide="sparkles" class="w-4 h-4"></i>
+            Collection
+          </span>
+          <span class="collection-meta">
+            Cosmetics · badges
+            <i data-lucide="chevron-down" class="w-4 h-4 collection-chevron"></i>
+          </span>
+        </button>
 
-        <div class="glass-panel p-5 rounded-3xl space-y-3">
-          <h3 class="text-sm font-extrabold text-slate-900">Profile Ring Accents</h3>
-          <p class="text-xs text-slate-500">Customize your location beacon accent ring using earned Field Credits.</p>
-          <div id="climb-aura-list" class="space-y-2.5"></div>
-        </div>
-      </div>
+        <div id="activity-collection" class="hidden space-y-4">
+          <div class="panel cosmetic-shop">
+            <div class="panel-head">
+              <h3>Cosmetics</h3>
+              <span class="panel-note"><span id="shop-credit-balance">145</span> credits</span>
+            </div>
+            <p class="shop-note">Change how you look on the map. Nothing here changes what you can do.</p>
+            <div id="cosmetic-tabs" class="cosmetic-tabs" role="tablist" aria-label="Cosmetic category"></div>
+            <p id="cosmetic-slot-note" class="shop-slot-note">How you stand on the map</p>
+            <div id="cosmetic-shelf" class="cosmetic-shelf"></div>
+          </div>
 
-      <!-- Spatial & Dialogue Milestones (6 Badges including 10 in Same Mile) -->
-      <div class="glass-panel p-5 rounded-3xl space-y-3">
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-sm font-extrabold text-slate-900">Spatial &amp; Dialogue Milestones</h3>
-            <p class="text-xs text-slate-500">Includes the 10-Insights-in-Same-Mile neighborhood cluster benchmark.</p>
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Badges</h3>
+              <span class="panel-note">Including ten insights in one mile</span>
+            </div>
+            <div id="climb-achievements-grid" class="badge-grid"></div>
           </div>
         </div>
-        <div id="climb-achievements-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3"></div>
       </div>
     </section>
 
@@ -431,130 +393,193 @@
          =================================================================== -->
     <section id="view-settings" class="app-view relative w-full h-full overflow-y-auto px-4 pt-6 pb-28 max-w-3xl mx-auto space-y-5">
 
-      <header>
-        <span class="text-[11px] font-bold uppercase tracking-wider text-teal-700">Preferences &amp; Zero-Knowledge Privacy</span>
-        <h1 class="text-xl font-extrabold tracking-tight text-slate-900">Settings &amp; Calibration</h1>
-        <p class="text-xs text-slate-500">Configure your profile, appearance, world map layer, urban sprawl radius, and local AES-256-GCM vault.</p>
+      <header class="view-head">
+        <div>
+          <span class="eyebrow">Preferences</span>
+          <h1>Settings</h1>
+          <p>Your profile, your map, and what stays on this device.</p>
+        </div>
       </header>
 
-      <!-- Identity & Double-Blind Contact Handle -->
-      <div class="glass-panel p-5 rounded-3xl space-y-4">
-        <h2 class="text-sm font-extrabold text-slate-900">Identity &amp; Double-Blind Contact Card</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <div>
-            <label for="input-first-name" class="text-xs font-bold text-slate-700 block mb-1">First Name / Alias</label>
-            <input id="input-first-name" type="text" value="Alex" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 focus:outline-none focus:border-teal-600" />
-          </div>
-          <div>
-            <label for="input-contact-handle" class="text-xs font-bold text-slate-700 block mb-1">Double-Blind Contact Handle (Revealed Only on Mutual Match)</label>
-            <input id="input-contact-handle" type="text" value="@alex.radia" class="w-full px-3.5 py-2 rounded-xl border border-slate-300 text-xs font-semibold text-slate-900 focus:outline-none focus:border-teal-600" />
-          </div>
-        </div>
-      </div>
-
-      <!-- Appearance & World Map Layer -->
-      <div class="glass-panel p-5 rounded-3xl space-y-4">
-        <h2 class="text-sm font-extrabold text-slate-900">Appearance &amp; World Map Repository</h2>
-
-        <div class="space-y-2">
-          <span class="text-xs font-bold text-slate-700 block">Interface Appearance</span>
-          <div class="grid grid-cols-2 gap-2">
-            <button type="button" class="appearance-mode-btn btn-emerald py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2" data-appearance="light">
-              <i data-lucide="sun" class="w-4 h-4"></i>
-              <span>Daylight Mode (Default)</span>
-            </button>
-            <button type="button" class="appearance-mode-btn btn-glass py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2" data-appearance="dark">
-              <i data-lucide="moon" class="w-4 h-4"></i>
-              <span>Evening Dark Mode</span>
-            </button>
-          </div>
+      <section class="panel">
+        <div class="panel-head">
+          <h3>You</h3>
+          <span class="panel-note">Stored locally</span>
         </div>
 
-        <div class="space-y-2 pt-1">
-          <span class="text-xs font-bold text-slate-700 block">Default World Map Tile Provider</span>
-          <div class="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <button type="button" class="theme-select-btn btn-emerald py-2 px-3 rounded-xl text-xs font-bold" data-provider="voyager">Carto Voyager (Street)</button>
-            <button type="button" class="theme-select-btn btn-glass py-2 px-3 rounded-xl text-xs font-bold" data-provider="osm">OpenStreetMap Standard</button>
-            <button type="button" class="theme-select-btn btn-glass py-2 px-3 rounded-xl text-xs font-bold" data-provider="positron">Carto Positron (Light)</button>
-            <button type="button" class="theme-select-btn btn-glass py-2 px-3 rounded-xl text-xs font-bold" data-provider="topo">Esri World Topographic</button>
-            <button type="button" class="theme-select-btn btn-glass py-2 px-3 rounded-xl text-xs font-bold" data-provider="dark">Carto Dark Matter</button>
+        <div class="field-grid">
+          <div class="field">
+            <label for="input-first-name">Name</label>
+            <input id="input-first-name" type="text" value="Alex" />
+          </div>
+          <div class="field">
+            <label for="input-contact-handle">Contact handle</label>
+            <input id="input-contact-handle" type="text" value="@alex.radia" />
           </div>
         </div>
-      </div>
+        <p class="field-note">Your handle is only shared after you both choose to connect.</p>
+      </section>
 
-      <!-- Comfort Timer & Adaptive Urban Sprawl Density -->
-      <div class="glass-panel p-5 rounded-3xl space-y-4">
-        <h2 class="text-sm font-extrabold text-slate-900">Comfort Timer &amp; Urban Sprawl Bubble Calibration</h2>
-
-        <div class="space-y-1.5">
-          <span class="text-xs font-bold text-slate-700 block">Preferred Dialogue Comfort Timer (Synced via min(Timer A, Timer B))</span>
-          <div class="grid grid-cols-3 gap-2">
-            <button type="button" class="timer-pref-btn btn-emerald py-2 rounded-xl text-xs font-bold" data-time="180">3 Minutes</button>
-            <button type="button" class="timer-pref-btn btn-glass py-2 rounded-xl text-xs font-bold" data-time="300">5 Minutes</button>
-            <button type="button" class="timer-pref-btn btn-glass py-2 rounded-xl text-xs font-bold" data-time="0">Open-Ended</button>
-          </div>
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Appearance</h3>
         </div>
-
-        <div class="space-y-1.5 pt-1">
-          <span class="text-xs font-bold text-slate-700 block">Urban Sprawl Population Density Calibration</span>
-          <div class="grid grid-cols-2 sm:grid-cols-4 gap-2">
-            <button type="button" class="sprawl-zone-btn btn-glass py-2 px-2.5 rounded-xl text-xs font-bold" data-sprawl="urban_core">Urban Core (18ft)</button>
-            <button type="button" class="sprawl-zone-btn btn-glass py-2 px-2.5 rounded-xl text-xs font-bold" data-sprawl="campus_plaza">Campus Plaza (28ft)</button>
-            <button type="button" class="sprawl-zone-btn btn-emerald py-2 px-2.5 rounded-xl text-xs font-bold" data-sprawl="park_neighborhood">Park Standard (40ft)</button>
-            <button type="button" class="sprawl-zone-btn btn-glass py-2 px-2.5 rounded-xl text-xs font-bold" data-sprawl="open_trail">Open Trail (65ft)</button>
-          </div>
-        </div>
-
-        <div class="flex items-center justify-between pt-2 border-t border-slate-200">
-          <div>
-            <span class="text-xs font-bold text-slate-900 block">Haptic &amp; Acoustic Proximity Alerts</span>
-            <span class="text-[11px] text-slate-500">Gentle chime when a mutual collision occurs within your calibrated radius</span>
-          </div>
-          <input id="toggle-pocket-pulse" type="checkbox" checked class="w-4 h-4 accent-teal-600" />
-        </div>
-      </div>
-
-      <!-- Zero-Knowledge Vault & Safety Diagnostics -->
-      <div class="glass-panel p-5 rounded-3xl space-y-4">
-        <h2 class="text-sm font-extrabold text-slate-900">Zero-Knowledge Local Vault &amp; Safety Diagnostics</h2>
-        <div class="grid grid-cols-3 gap-2.5">
-          <div class="p-3 rounded-2xl bg-slate-100/80 border border-slate-200">
-            <span class="text-[10px] font-bold uppercase text-slate-500 block">Vault Encryption</span>
-            <span id="settings-vault-status" class="text-xs font-mono-code font-bold text-teal-700">4 Nodes • AES-256-GCM</span>
-          </div>
-          <div class="p-3 rounded-2xl bg-slate-100/80 border border-slate-200">
-            <span class="text-[10px] font-bold uppercase text-slate-500 block">Safety Rater Weight</span>
-            <span id="settings-credibility-weight" class="text-xs font-mono-code font-bold text-slate-900">1.00x Weight</span>
-          </div>
-          <div class="p-3 rounded-2xl bg-slate-100/80 border border-slate-200">
-            <span class="text-[10px] font-bold uppercase text-slate-500 block">Blocked Peers</span>
-            <span id="settings-blocked-count" class="text-xs font-mono-code font-bold text-slate-900">0 Blocked</span>
-          </div>
-        </div>
-
-        <div class="flex flex-wrap items-center gap-2 pt-1">
-          <button id="btn-unblock-all-peers" type="button" class="btn-glass px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700">
-            Restore Blocked Peers
+        <div class="segmented segmented--2">
+          <button type="button" class="appearance-mode-btn btn-emerald" data-appearance="light">
+            <i data-lucide="sun" class="w-4 h-4"></i>
+            <span>Daylight</span>
           </button>
-          <button id="btn-wipe-vault" type="button" class="btn-glass px-3.5 py-2 rounded-xl text-xs font-bold text-rose-600">
-            Reset Local Vault to Starter Data
+          <button type="button" class="appearance-mode-btn btn-glass" data-appearance="dark">
+            <i data-lucide="moon" class="w-4 h-4"></i>
+            <span>Evening</span>
           </button>
         </div>
-      </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Map</h3>
+          <span class="panel-note">No key needed</span>
+        </div>
+
+        <div class="segmented segmented--3 segmented--wrap">
+          <button type="button" class="theme-select-btn btn-emerald" data-provider="voyager">Daylight</button>
+          <button type="button" class="theme-select-btn btn-glass" data-provider="osm">Vivid</button>
+          <button type="button" class="theme-select-btn btn-glass" data-provider="positron">Calm</button>
+          <button type="button" class="theme-select-btn btn-glass" data-provider="topo">Terrain</button>
+          <button type="button" class="theme-select-btn btn-glass" data-provider="dark">Evening</button>
+        </div>
+        <p class="field-note">Free OpenStreetMap and Esri tiles, straight from the source.</p>
+
+        <div class="panel-split"></div>
+
+        <div class="field">
+          <label for="input-maptiler-key">MapTiler key <span class="field-optional">optional</span></label>
+          <div class="field-inline">
+            <input id="input-maptiler-key" type="text" autocomplete="off" spellcheck="false"
+              placeholder="Only if you want richer imagery" />
+            <button id="btn-save-maptiler-key" type="button" class="btn-emerald btn-inline">Save</button>
+          </div>
+        </div>
+        <p id="maptiler-key-status" class="field-note">
+          Sent only to MapTiler, kept in this browser. Leave blank to stay on free tiles.
+        </p>
+
+        <div class="switch-row">
+          <div>
+            <span class="switch-title">Demo world</span>
+            <span class="switch-note">Invented neighbours so you can preview an active map.</span>
+          </div>
+          <input id="toggle-demo-mode" type="checkbox" class="switch" />
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h3>People nearby</h3>
+        </div>
+        <p class="field-note field-note--top">Open two tabs to see presence work in this browser, or connect a hosted channel for real devices.</p>
+
+        <div class="segmented segmented--3">
+          <button type="button" class="presence-driver-btn btn-glass" data-presence="off">Off</button>
+          <button type="button" class="presence-driver-btn btn-glass" data-presence="local">This browser</button>
+          <button type="button" class="presence-driver-btn btn-glass" data-presence="supabase">Hosted</button>
+        </div>
+
+        <p id="presence-status" class="presence-status">Only you on the map.</p>
+
+        <div id="presence-hosted-fields" class="hidden">
+          <div class="panel-split"></div>
+          <div class="field">
+            <label for="input-supabase-url">Project URL</label>
+            <input id="input-supabase-url" type="text" autocomplete="off" spellcheck="false"
+              placeholder="https://your-project.supabase.co" />
+          </div>
+          <div class="field">
+            <label for="input-supabase-anon-key">Anon public key</label>
+            <input id="input-supabase-anon-key" type="text" autocomplete="off" spellcheck="false"
+              placeholder="eyJhbGciOi…" />
+          </div>
+          <button id="btn-save-presence" type="button" class="btn-emerald btn-block">Save and connect</button>
+          <p class="field-note">The anon key is public by design. People share a channel only inside their ~1.2 km cell.</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Conversation</h3>
+        </div>
+
+        <div class="field">
+          <label>Comfort timer</label>
+          <div class="segmented segmented--3">
+            <button type="button" class="timer-pref-btn btn-emerald" data-time="180">3 min</button>
+            <button type="button" class="timer-pref-btn btn-glass" data-time="300">5 min</button>
+            <button type="button" class="timer-pref-btn btn-glass" data-time="0">Open</button>
+          </div>
+          <p class="field-note">The shorter of the two timers wins, so no one is held in a chat.</p>
+        </div>
+
+        <div class="field field--spaced">
+          <label>Radius preset</label>
+          <div class="segmented segmented--4">
+            <button type="button" class="sprawl-zone-btn btn-glass" data-sprawl="urban_core">Core</button>
+            <button type="button" class="sprawl-zone-btn btn-glass" data-sprawl="campus_plaza">Campus</button>
+            <button type="button" class="sprawl-zone-btn btn-emerald" data-sprawl="park_neighborhood">Park</button>
+            <button type="button" class="sprawl-zone-btn btn-glass" data-sprawl="open_trail">Trail</button>
+          </div>
+          <p class="field-note">18 ft in a crowd, up to 65 ft in the open. The bubble grows only for real people.</p>
+        </div>
+
+        <div class="switch-row">
+          <div>
+            <span class="switch-title">Sound and haptics</span>
+            <span class="switch-note">A gentle cue when someone enters your radius.</span>
+          </div>
+          <input id="toggle-pocket-pulse" type="checkbox" checked class="switch" />
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h3>Privacy</h3>
+          <span class="panel-note">On this device</span>
+        </div>
+
+        <div class="stat-row stat-row--3">
+          <div class="stat">
+            <dt>Vault</dt>
+            <dd id="settings-vault-status" class="stat-small">AES-256-GCM</dd>
+          </div>
+          <div class="stat">
+            <dt>Safety weight</dt>
+            <dd id="settings-credibility-weight" class="stat-small">1.00×</dd>
+          </div>
+          <div class="stat">
+            <dt>Blocked</dt>
+            <dd id="settings-blocked-count" class="stat-small">0</dd>
+          </div>
+        </div>
+
+        <div class="panel-actions">
+          <button id="btn-unblock-all-peers" type="button" class="btn-glass btn-inline">Restore blocked peers</button>
+          <button id="btn-wipe-vault" type="button" class="btn-danger">Clear all local data</button>
+        </div>
+      </section>
     </section>
 
     <!-- ===================================================================
          BOTTOM NAVIGATION DOCK (4 INTUITIVE CONSUMER TABS)
          =================================================================== -->
-    <nav class="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 px-2 py-1.5 rounded-full glass-panel flex items-center gap-1 shadow-xl">
+    <nav id="bottom-dock" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-30 px-2 py-1.5 rounded-full glass-panel flex items-center gap-1 shadow-xl">
       <button type="button" class="dock-item active" data-target="view-radar">
         <i data-lucide="map" class="w-4 h-4"></i>
-        <span>Explore Map</span>
+        <span>Map</span>
       </button>
 
       <button type="button" class="dock-item relative" data-target="view-reflections">
         <i data-lucide="network" class="w-4 h-4"></i>
-        <span>Insight Graph</span>
+        <span>Graph</span>
         <span id="dock-insight-badge" class="ml-0.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1.5 rounded-full bg-teal-500/15 text-teal-700 text-[10px] font-mono-code font-extrabold leading-none">6</span>
       </button>
 
@@ -808,16 +833,16 @@
 
       <div class="space-y-3 text-xs text-slate-600 leading-relaxed">
         <div class="p-3 rounded-2xl bg-slate-100/80 border border-slate-200">
-          <strong class="text-slate-900 block mb-0.5">1. Live World Map &amp; Adaptive Sprawl Radius</strong>
-          Switch between 5 free global map repositories (`Street &amp; Park`, `OSM Detail`, `Minimal Light`, `Topographic`, `Evening Dark`) or jump between cities (`NYC`, `SF`, `London`, `Austin`, `Tokyo`, or `Live GPS`). Your proximity bubble automatically scales from `18ft` in dense urban cores to `65ft` on open trails.
+          <strong class="text-slate-900 block mb-0.5">1. You are the centre of the map</strong>
+          Radia anchors on your real GPS position. Your conversation bubble is calibrated to the place you are standing — tight in a dense street, wider on an open trail — and it grows only when real people join you. Map styles are free and need no API key.
         </div>
         <div class="p-3 rounded-2xl bg-slate-100/80 border border-slate-200">
-          <strong class="text-slate-900 block mb-0.5">2. Walking Telemetry &amp; Community Hubs</strong>
-          Tap anywhere on the world map to walk there, or use Auto-Walk / Live GPS. Walking earns Field Credits and unlocks distance benchmarks (`0.25km` to `1.0 Mile`).
+          <strong class="text-slate-900 block mb-0.5">2. Walking earns credit</strong>
+          Start a walk and Radia records the distance you actually travel. Every hundred metres earns Field Credits and moves your distance goals along. Nothing is simulated, and tapping the map never mints credit.
         </div>
         <div class="p-3 rounded-2xl bg-slate-100/80 border border-slate-200">
-          <strong class="text-slate-900 block mb-0.5">3. Mutual Insights &amp; AI Synthesis Graph</strong>
-          After each conversation, both participants share a thoughtful takeaway. Your insights connect in the **Insight Graph**, tracking spatial clusters (including *10 Insights in the Same Mile*) and synthesizing how you've changed, what you've learned, and your effect on people around you.
+          <strong class="text-slate-900 block mb-0.5">3. Every conversation leaves an insight</strong>
+          When a conversation ends, both people offer one thoughtful thing they took from it. Those insights become your insight graph — linked to the prompt and the place they happened — so you can see how you've changed, what you've learned, and your effect on the people around you.
         </div>
       </div>
     </div>
@@ -826,10 +851,12 @@
   <!-- =====================================================================
        APPLICATION SCRIPTS
        ===================================================================== -->
+  <script src="js/config.js"></script>
   <script src="js/prompts.js"></script>
   <script src="js/storage.js"></script>
   <script src="js/audio.js"></script>
   <script src="js/proximity.js"></script>
+  <script src="js/presence.js"></script>
   <script src="js/peer-sync.js"></script>
   <script src="js/gamification.js"></script>
   <script src="js/app.js"></script>

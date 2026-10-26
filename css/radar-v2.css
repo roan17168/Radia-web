@@ -1,0 +1,951 @@
+/* ==========================================================================
+   RADIA — CALM MAP-FIRST HUD (css/radar-v2.css)
+   --------------------------------------------------------------------------
+   Loaded after radar.css. Replaces the arcade HUD with a quiet, legible layer:
+   one availability control, one radius control, one primary action, honest
+   empty states, and soft map tinting that makes raster tiles feel hand-drawn.
+   ========================================================================== */
+
+:root {
+  --radia-surface: rgba(255, 255, 255, 0.94);
+  --radia-surface-solid: #ffffff;
+  --radia-ink: #0f172a;
+  --radia-ink-soft: #56637a;
+  --radia-line: rgba(15, 23, 42, 0.09);
+  --radia-accent: #0f766e;
+  --radia-accent-soft: rgba(15, 118, 110, 0.1);
+  --radia-amber: #b45309;
+  --radia-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 4px 14px rgba(15, 23, 42, 0.08);
+  --radia-shadow-md: 0 2px 6px rgba(15, 23, 42, 0.08), 0 16px 40px rgba(15, 23, 42, 0.14);
+  --radia-hud-top: calc(12px + env(safe-area-inset-top, 0px));
+  --radia-hud-bottom: calc(92px + env(safe-area-inset-bottom, 0px));
+}
+
+html.theme-dark {
+  --radia-surface: rgba(17, 24, 33, 0.94);
+  --radia-surface-solid: #111821;
+  --radia-ink: #eef2f7;
+  --radia-ink-soft: #a7b3c4;
+  --radia-line: rgba(255, 255, 255, 0.12);
+  --radia-accent: #5eead4;
+  --radia-accent-soft: rgba(94, 234, 212, 0.14);
+  --radia-amber: #fbbf24;
+  --radia-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45), 0 6px 18px rgba(0, 0, 0, 0.35);
+  --radia-shadow-md: 0 2px 8px rgba(0, 0, 0, 0.5), 0 20px 48px rgba(0, 0, 0, 0.45);
+}
+
+/* --------------------------------------------------------------------------
+   1. MAP SURFACE & TILE TREATMENT
+   Tiles get a gentle palette shift instead of neon overlays. Dark mode is a
+   filtered tile layer rather than a second CDN.
+   -------------------------------------------------------------------------- */
+
+#view-radar,
+#radar-world-stage {
+  height: 100%;
+  min-height: 100%;
+  background: #eef1ee;
+}
+
+html.theme-dark #view-radar,
+html.theme-dark #radar-world-stage {
+  background: #0e141b;
+}
+
+#leaflet-radar-map {
+  background: #eef1ee !important;
+}
+
+html.theme-dark #leaflet-radar-map {
+  background: #0e141b !important;
+}
+
+/* Soft, warm daylight — reads as a hand-coloured map rather than GIS output */
+.radia-tiles-soft {
+  filter: saturate(0.74) brightness(1.05) contrast(0.95) sepia(0.06);
+}
+.radia-tiles-vivid {
+  filter: saturate(1.02) brightness(1.02);
+}
+.radia-tiles-gray {
+  filter: grayscale(0.82) brightness(1.07) contrast(0.92);
+}
+.radia-tiles-terrain {
+  filter: saturate(0.86) brightness(1.04) contrast(0.95);
+}
+.radia-tiles-dark {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.55);
+}
+
+/* Paper-grain warmth + edge fade so the map never fights the HUD */
+#radar-world-stage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(255, 255, 255, 0) 55%, rgba(20, 33, 28, 0.06) 100%),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0) 22%);
+}
+
+html.theme-dark #radar-world-stage::after {
+  background:
+    radial-gradient(120% 80% at 50% 0%, rgba(0, 0, 0, 0) 55%, rgba(0, 0, 0, 0.35) 100%),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.28), rgba(0, 0, 0, 0) 26%);
+}
+
+/* The player marker: a wayfinder beacon. A glass compass disc with an
+   eight-point star, an ember centre, a heading needle on the rim and a
+   pair of sonar rings expanding from the exact fix. */
+.user-puck-container {
+  position: relative;
+  width: 68px;
+  height: 68px;
+  display: grid;
+  place-items: center;
+  overflow: visible;
+}
+
+.user-puck-pulse {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  margin: -23px 0 0 -23px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--avatar-primary, #0f766e) 55%, transparent);
+  background: radial-gradient(circle, rgba(15, 118, 110, 0.10) 0%, rgba(15, 118, 110, 0) 72%);
+  animation: beacon-sonar 3.4s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.user-puck-pulse--delay {
+  animation-delay: 1.7s;
+}
+
+@keyframes beacon-sonar {
+  0%   { transform: scale(0.55); opacity: 0.85; }
+  70%  { opacity: 0.18; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+
+.user-dot {
+  position: relative;
+  z-index: 2;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle at 34% 26%, var(--beacon-disc-a, #1f7460) 0%, var(--beacon-disc-b, #0b4f3f) 62%, var(--beacon-disc-c, #06362a) 100%);
+  border: 2px solid var(--beacon-ring, rgba(255, 255, 255, 0.94));
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.28) inset,
+    0 3px 8px rgba(7, 34, 27, 0.24),
+    0 12px 26px rgba(7, 34, 27, 0.22),
+    0 0 26px var(--beacon-glow, rgba(20, 110, 90, 0.35));
+}
+
+/* A hairline ring and a satellite that circles it, once every ten seconds. */
+.user-dot::before {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  border-radius: 999px;
+  border: 1px solid rgba(11, 79, 63, 0.26);
+}
+
+.user-dot::after {
+  content: '';
+  position: absolute;
+  inset: -7px;
+  border-radius: 999px;
+  background: radial-gradient(circle at 50% 0%, rgba(247, 251, 248, 0.95) 0 1.7px, transparent 2.2px);
+  animation: beacon-spin 11s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes beacon-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+.user-beacon-star {
+  width: 21px;
+  height: 21px;
+  background: var(--beacon-star, #f7fbf8);
+  clip-path: var(--beacon-clip, polygon(50% 0%, 61% 38%, 100% 50%, 61% 62%, 50% 100%, 39% 62%, 0% 50%, 39% 38%));
+  filter: drop-shadow(0 1px 2px rgba(4, 30, 23, 0.45));
+  transition: background 0.3s ease, clip-path 0.3s ease;
+}
+
+.user-dot-core {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--beacon-core, #e8996d);
+  box-shadow: 0 0 0 1.5px var(--beacon-disc-c, #06362a);
+  z-index: 3;
+}
+
+html.theme-dark .user-dot {
+  background: radial-gradient(circle at 34% 26%, #2c8b73 0%, #12634f 62%, #084033 100%);
+  border-color: rgba(255, 255, 255, 0.86);
+}
+
+/* Walking: the disc lifts a little with each step. */
+.user-puck-container.is-walking .user-dot {
+  animation: beacon-bob 1.15s ease-in-out infinite;
+}
+
+.user-puck-container.is-walking .user-puck-pulse {
+  animation-duration: 2.2s;
+}
+
+@keyframes beacon-bob {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-2.5px); }
+}
+
+.user-puck-heading {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  z-index: 3;
+  pointer-events: none;
+}
+
+/* A stray triangle above the disc read as a second marker; the orbiting rim
+   light already carries the sense of movement. */
+.user-puck-heading-arrow {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   AURAS — a living field around the medallion, chosen in Collection.
+   Every span is a single particle; the root data-aura picks the behaviour.
+   -------------------------------------------------------------------------- */
+
+.beacon-aura {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.beacon-aura span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  display: block;
+  opacity: 0;
+  transform: translate(-50%, -50%);
+}
+
+/* Warm dust lifting away. */
+html[data-aura='motes'] .beacon-aura span {
+  width: 5px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--aura-color, #fbbf24);
+  box-shadow: 0 0 9px var(--aura-color, #fbbf24);
+  animation: aura-mote 3s ease-out infinite;
+}
+
+html[data-aura='motes'] .beacon-aura span:nth-child(1) { margin-left: -13px; --drift: -9px; animation-delay: 0s; }
+html[data-aura='motes'] .beacon-aura span:nth-child(2) { margin-left: 11px;  --drift: 6px;  animation-delay: 0.7s; }
+html[data-aura='motes'] .beacon-aura span:nth-child(3) { margin-left: -2px;  --drift: -4px; animation-delay: 1.5s; }
+html[data-aura='motes'] .beacon-aura span:nth-child(4) { margin-left: 18px;  --drift: 10px; animation-delay: 2.2s; }
+html[data-aura='motes'] .beacon-aura span:nth-child(5) { margin-left: -19px; --drift: -6px; animation-delay: 2.9s; }
+html[data-aura='motes'] .beacon-aura span:nth-child(6) { margin-left: 3px;   --drift: 2px;  animation-delay: 3.4s; }
+
+@keyframes aura-mote {
+  0%   { transform: translate(-50%, 8px) scale(0.4); opacity: 0; }
+  22%  { opacity: 0.95; }
+  100% { transform: translate(calc(-50% + var(--drift, 0px)), -46px) scale(1); opacity: 0; }
+}
+
+/* Six fireflies in slow orbit. */
+html[data-aura='fireflies'] .beacon-aura { animation: aura-spin 18s linear infinite; }
+
+html[data-aura='fireflies'] .beacon-aura span {
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 999px;
+  background: var(--aura-color, #a3e635);
+  box-shadow: 0 0 10px var(--aura-color, #a3e635);
+  transform: rotate(var(--a, 0deg)) translateY(-39px);
+  animation: aura-twinkle 2.6s ease-in-out infinite;
+}
+
+html[data-aura='fireflies'] .beacon-aura span:nth-child(1) { --a: 0deg;   animation-delay: 0s; }
+html[data-aura='fireflies'] .beacon-aura span:nth-child(2) { --a: 60deg;  animation-delay: 0.3s; }
+html[data-aura='fireflies'] .beacon-aura span:nth-child(3) { --a: 120deg; animation-delay: 0.6s; }
+html[data-aura='fireflies'] .beacon-aura span:nth-child(4) { --a: 180deg; animation-delay: 0.9s; }
+html[data-aura='fireflies'] .beacon-aura span:nth-child(5) { --a: 240deg; animation-delay: 1.2s; }
+html[data-aura='fireflies'] .beacon-aura span:nth-child(6) { --a: 300deg; animation-delay: 1.5s; }
+
+/* Blossom petals drifting up. */
+html[data-aura='petals'] .beacon-aura span {
+  width: 9px;
+  height: 14px;
+  border-radius: 62% 38% 55% 45%;
+  background: var(--aura-color, #fda4af);
+  opacity: 0;
+  animation: aura-petal 4.8s linear infinite;
+}
+
+html[data-aura='petals'] .beacon-aura span:nth-child(1) { margin-left: -16px; --drift: -14px; animation-delay: 0s; }
+html[data-aura='petals'] .beacon-aura span:nth-child(2) { margin-left: 12px;  --drift: 9px;   animation-delay: 1.1s; }
+html[data-aura='petals'] .beacon-aura span:nth-child(3) { margin-left: 0;    --drift: -5px;  animation-delay: 2.2s; }
+html[data-aura='petals'] .beacon-aura span:nth-child(4) { margin-left: 19px;  --drift: 12px;  animation-delay: 3.3s; }
+html[data-aura='petals'] .beacon-aura span:nth-child(5) { margin-left: -21px; --drift: -8px;  animation-delay: 4.1s; }
+html[data-aura='petals'] .beacon-aura span:nth-child(6) { margin-left: 5px;   --drift: 4px;   animation-delay: 4.9s; }
+
+@keyframes aura-petal {
+  0%   { transform: translate(-50%, 10px) rotate(0deg); opacity: 0; }
+  18%  { opacity: 0.9; }
+  100% { transform: translate(calc(-50% + var(--drift, 0px)), -52px) rotate(210deg); opacity: 0; }
+}
+
+/* Two rings breathing outward. */
+html[data-aura='halo'] .beacon-aura span {
+  width: 54px;
+  height: 54px;
+  border-radius: 999px;
+  border: 1.5px solid var(--aura-color, #7fc3a8);
+  animation: aura-halo 4.6s cubic-bezier(0.22, 0.7, 0.3, 1) infinite;
+}
+
+html[data-aura='halo'] .beacon-aura span:nth-child(1) { animation-delay: 0s; }
+html[data-aura='halo'] .beacon-aura span:nth-child(2) { animation-delay: 2.3s; }
+html[data-aura='halo'] .beacon-aura span:nth-child(n + 3) { display: none; }
+
+@keyframes aura-halo {
+  0%   { transform: translate(-50%, -50%) scale(0.62); opacity: 0.85; }
+  100% { transform: translate(-50%, -50%) scale(1.9); opacity: 0; }
+}
+
+/* Small stars on a faint arc. */
+html[data-aura='constellation'] .beacon-aura { animation: aura-spin 30s linear infinite; }
+
+html[data-aura='constellation'] .beacon-aura::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 82px;
+  height: 40px;
+  margin: -20px 0 0 -41px;
+  border: 1px dashed color-mix(in srgb, var(--aura-color, #c4b5fd) 42%, transparent);
+  border-radius: 999px;
+}
+
+html[data-aura='constellation'] .beacon-aura span {
+  width: 6px;
+  height: 6px;
+  margin: -3px 0 0 -3px;
+  background: var(--aura-color, #c4b5fd);
+  clip-path: polygon(50% 0%, 61% 38%, 100% 50%, 61% 62%, 50% 100%, 39% 62%, 0% 50%, 39% 38%);
+  filter: drop-shadow(0 0 5px var(--aura-color, #c4b5fd));
+  transform: rotate(var(--a, 0deg)) translateY(-40px);
+  animation: aura-twinkle 2.8s ease-in-out infinite;
+}
+
+html[data-aura='constellation'] .beacon-aura span:nth-child(1) { --a: 20deg;  animation-delay: 0s; }
+html[data-aura='constellation'] .beacon-aura span:nth-child(2) { --a: 82deg;  animation-delay: 0.5s; }
+html[data-aura='constellation'] .beacon-aura span:nth-child(3) { --a: 144deg; animation-delay: 1s; }
+html[data-aura='constellation'] .beacon-aura span:nth-child(4) { --a: 206deg; animation-delay: 1.5s; }
+html[data-aura='constellation'] .beacon-aura span:nth-child(5) { --a: 268deg; animation-delay: 2s; }
+html[data-aura='constellation'] .beacon-aura span:nth-child(6) { --a: 330deg; animation-delay: 2.5s; }
+
+@keyframes aura-spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes aura-twinkle {
+  0%, 100% { opacity: 0.35; }
+  50%      { opacity: 1; }
+}
+
+/* Leaflet path effects used by radius cosmetics. */
+.leaflet-overlay-pane path.radius-aurora {
+  animation: radius-current 16s linear infinite;
+}
+
+@keyframes radius-current {
+  to { stroke-dashoffset: -180; }
+}
+
+.leaflet-overlay-pane path.radius-bloom {
+  filter: drop-shadow(0 0 7px rgba(94, 234, 212, 0.45));
+}
+
+.user-puck-heading::after,
+.strider-avatar-svg,
+.strider-rig-root {
+  display: none;
+}
+
+.radia-user-puck-marker {
+  background: transparent;
+  border: none;
+}
+
+/* Neighbour markers: readable discs, no full-body illustrations unless demo */
+.leaflet-marker-icon.radia-roaming-peer-marker {
+  filter: drop-shadow(0 4px 8px rgba(15, 23, 42, 0.18));
+}
+
+/* --------------------------------------------------------------------------
+   2. TOP BAR
+   -------------------------------------------------------------------------- */
+
+.radar-topbar {
+  position: absolute;
+  top: var(--radia-hud-top);
+  left: 12px;
+  right: 12px;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.radar-topbar-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.radar-topbar > * {
+  pointer-events: auto;
+}
+
+.radar-availability {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 14px 0 12px;
+  border-radius: 999px;
+  background: var(--radia-surface);
+  border: 1px solid var(--radia-line);
+  box-shadow: var(--radia-shadow-sm);
+  backdrop-filter: blur(14px);
+  color: var(--radia-ink);
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  transition: transform 0.16s ease, box-shadow 0.16s ease;
+}
+
+.radar-availability:active {
+  transform: scale(0.97);
+}
+
+.radar-availability .avail-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.16);
+  flex-shrink: 0;
+}
+
+.radar-availability.is-paused .avail-dot {
+  background: #94a3b8;
+  box-shadow: 0 0 0 3px rgba(148, 163, 184, 0.18);
+}
+
+.radar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.radar-icon-btn {
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--radia-surface);
+  border: 1px solid var(--radia-line);
+  box-shadow: var(--radia-shadow-sm);
+  backdrop-filter: blur(14px);
+  color: var(--radia-ink);
+  transition: transform 0.16s ease, color 0.16s ease, border-color 0.16s ease;
+}
+
+.radar-icon-btn:hover,
+.radar-icon-btn[aria-expanded='true'] {
+  color: var(--radia-accent);
+  border-color: color-mix(in srgb, var(--radia-accent) 32%, transparent);
+}
+
+.radar-icon-btn:active {
+  transform: scale(0.94);
+}
+
+.radar-meta-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.radar-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: var(--radia-surface);
+  border: 1px solid var(--radia-line);
+  box-shadow: var(--radia-shadow-sm);
+  backdrop-filter: blur(14px);
+  color: var(--radia-ink);
+  font-size: 11.5px;
+  font-weight: 650;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+}
+
+.radar-chip .radar-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--radia-accent);
+}
+
+.radar-chip--amber {
+  color: var(--radia-ink);
+  border-color: var(--radia-line);
+  background: var(--radia-surface);
+}
+
+.radar-chip--amber i {
+  color: var(--radia-amber);
+}
+
+.radar-chip--action {
+  cursor: pointer;
+  transition: transform 0.16s ease;
+}
+
+.radar-chip--action:active {
+  transform: scale(0.97);
+}
+
+.radar-chip--action.is-recording {
+  background: var(--radia-accent);
+  border-color: transparent;
+  color: #ffffff;
+}
+
+html.theme-dark .radar-chip--action.is-recording {
+  color: #06251f;
+}
+
+.radar-chip-divider {
+  width: 1px;
+  height: 14px;
+  background: currentColor;
+  opacity: 0.18;
+}
+
+.radar-credits {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  opacity: 0.85;
+}
+
+.radar-coords.is-preview {
+  color: var(--radia-amber);
+  border-color: color-mix(in srgb, var(--radia-amber) 30%, transparent);
+  cursor: pointer;
+}
+
+/* Demo location is a footnote, not a warning. */
+.radar-coords.is-demo {
+  color: var(--radia-ink-soft);
+  border-color: var(--radia-line);
+  cursor: pointer;
+}
+
+/* A quiet caption, not another pill competing with the HUD. */
+.radar-coords {
+  cursor: pointer;
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--radia-ink-soft);
+  background: transparent;
+  border: none;
+  padding: 0 2px;
+  opacity: 0.85;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.55);
+  font-variant-numeric: tabular-nums;
+}
+
+.radar-coords.is-preview {
+  color: var(--radia-ink);
+  font-weight: 700;
+}
+
+html.theme-dark .radar-coords {
+  text-shadow: none;
+}
+
+/* --------------------------------------------------------------------------
+   3. POPOVER
+   -------------------------------------------------------------------------- */
+
+.radar-popover {
+  position: absolute;
+  top: 92px;
+  right: 0;
+  width: 288px;
+  padding: 14px;
+  border-radius: 20px;
+  background: var(--radia-surface-solid);
+  border: 1px solid var(--radia-line);
+  box-shadow: var(--radia-shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.radar-popover.hidden {
+  display: none;
+}
+
+.radar-popover-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--radia-ink);
+}
+
+.radar-popover-label {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--radia-ink-soft);
+  margin-top: 2px;
+}
+
+.radar-tile-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--radia-ink-soft);
+}
+
+/* A quiet track with a raised chip, matching Settings. */
+.radar-option-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  background: var(--paper-deep);
+  border: 1px solid var(--radia-line);
+  border-radius: 12px;
+}
+
+.radar-option-grid--cities {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  background: transparent;
+  border: 0;
+  padding: 0;
+  gap: 5px;
+}
+
+.map-provider-btn,
+.city-jump-btn {
+  height: 30px;
+  border-radius: 9px;
+  border: 1px solid var(--radia-line);
+  background: transparent;
+  color: var(--radia-ink-soft);
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 0 4px;
+  transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+
+/* Only the chosen style is a chip; the rest are labels on the track. */
+.radar-option-grid .map-provider-btn {
+  background: transparent !important;
+  border-color: transparent !important;
+  color: var(--radia-ink-soft) !important;
+}
+
+.map-provider-btn:hover,
+.city-jump-btn:hover {
+  color: var(--radia-ink);
+  background: var(--radia-accent-soft);
+}
+
+.radar-option-grid .map-provider-btn.is-active,
+.city-jump-btn.is-active {
+  background: var(--radia-surface-solid) !important;
+  border-color: transparent !important;
+  color: var(--radia-accent) !important;
+  box-shadow: 0 1px 2px rgba(14, 32, 25, 0.10),
+    0 3px 8px -5px rgba(14, 32, 25, 0.24);
+}
+
+html.theme-dark .radar-option-grid .map-provider-btn.is-active,
+html.theme-dark .city-jump-btn.is-active {
+  background: #22322b !important;
+  color: var(--radia-accent);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05) inset,
+    0 2px 6px rgba(0, 0, 0, 0.28);
+}
+
+/* City shortcuts are independent buttons, not a segmented track. */
+.city-jump-btn.is-active,
+html.theme-dark .city-jump-btn.is-active {
+  background: var(--radia-accent-soft);
+  border-color: transparent;
+  color: var(--radia-accent) !important;
+  box-shadow: none;
+}
+
+.radar-popover-note {
+  margin: 2px 0 0;
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--radia-ink-soft);
+}
+
+/* --------------------------------------------------------------------------
+   4. EMPTY STATE
+   -------------------------------------------------------------------------- */
+
+.radar-empty {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--radia-hud-bottom) + 56px);
+  z-index: 15;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.radar-empty.hidden {
+  display: none;
+}
+
+.radar-empty-card {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 316px;
+  padding: 12px 14px 11px;
+  border-radius: 18px;
+  background: var(--radia-surface);
+  border: 1px solid var(--radia-line);
+  box-shadow: var(--radia-shadow-md);
+  backdrop-filter: blur(16px);
+}
+
+.radar-eyebrow {
+  font-size: 9.5px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--radia-accent);
+}
+
+.radar-empty-card h2 {
+  margin: 2px 0 2px;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--radia-ink);
+}
+
+.radar-empty-card p {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.45;
+  color: var(--radia-ink-soft);
+}
+
+.radar-empty-actions {
+  display: flex;
+  gap: 7px;
+  margin-top: 10px;
+}
+
+.radar-btn {
+  flex: 1 1 0;
+  height: 32px;
+  border-radius: 11px;
+  border: 1px solid var(--radia-line);
+  background: transparent;
+  color: var(--radia-ink);
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.radar-btn--primary {
+  background: var(--radia-accent);
+  border-color: transparent;
+  color: #ffffff;
+}
+
+html.theme-dark .radar-btn--primary {
+  color: #06251f;
+}
+
+/* --------------------------------------------------------------------------
+   5. BOTTOM STRIP
+   -------------------------------------------------------------------------- */
+
+.radar-bottombar {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: var(--radia-hud-bottom);
+  z-index: 18;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  pointer-events: none;
+}
+
+.radar-bottombar > * {
+  pointer-events: auto;
+}
+
+.radar-status-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.radar-attribution {
+  position: fixed;
+  right: 12px;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 74px);
+  z-index: 6;
+  font-size: 8.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--radia-ink-soft);
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  opacity: 0.6;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  pointer-events: none;
+}
+
+html.theme-dark .radar-attribution {
+  background: transparent;
+  text-shadow: none;
+  opacity: 0.55;
+}
+
+/* Unify the tile palette with the rest of the app. */
+.leaflet-tile-pane {
+  filter: saturate(0.92) contrast(1.02);
+}
+
+/* Evening: the map has to belong to the same night as the rest of the app. */
+html.theme-dark .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(190deg) brightness(0.82) contrast(0.92) saturate(0.45);
+}
+
+html.theme-dark #radar-world-stage::after {
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(6, 14, 11, 0.10) 40%, rgba(6, 14, 11, 0.55) 100%),
+    linear-gradient(to bottom, rgba(6, 14, 11, 0.42), rgba(6, 14, 11, 0) 30%);
+}
+
+html.theme-dark .radar-coords {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.55);
+}
+
+.radar-inspector {
+  width: 100%;
+  max-width: 360px;
+}
+
+.radar-inspector.hidden {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   6. LEGACY ARCADE ELEMENTS — visually retired, kept for demo mode only
+   -------------------------------------------------------------------------- */
+
+.pogo-central-pulse-orb,
+.pogo-trainer-medallion,
+.pokestop-hub-beacon,
+.hud-banner {
+  display: none !important;
+}
+
+#radar-demo-controls {
+  /* Internal simulation switches: never part of the product surface. */
+  display: none !important;
+}
+
+#radar-demo-controls.hidden {
+  display: none;
+}
+
+/* Desktop: keep the HUD a comfortable width instead of stretching to the edges */
+@media (min-width: 720px) {
+  .radar-topbar,
+  .radar-bottombar {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(680px, calc(100% - 32px));
+  }
+
+  /* A notice sits with the HUD, not in the middle of the map. */
+  .radar-empty {
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    width: min(680px, calc(100% - 32px));
+    justify-content: flex-start;
+  }
+
+  .radar-empty-card {
+    max-width: 336px;
+  }
+}

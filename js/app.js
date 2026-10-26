@@ -60,6 +60,8 @@
       this._bindNavigationDock();
       this._bindTopHUDShortcuts();
       this._bindMapProviderAndCityControls();
+      this._bindRuntimeConfigControls();
+      this._bindPresenceControls();
       this._bindQuickGuideModal();
       this._bindSprawlCalibrationControls();
       this._bindSettingsAndProfile();
@@ -68,6 +70,7 @@
       this._bindCatalystSessionEvents();
       this._bindPostEncounterFlow();
       this._bindConstellationAndJournalEvents();
+      this._bindInsightsChrome();
       this._bindGlobalAchievementToasts();
       this._bindKeyboardAndBackdropDismissal();
 
@@ -129,6 +132,562 @@
       if (window.RadiaProximity && typeof window.RadiaProximity.setMapTheme === 'function') {
         window.RadiaProximity.setMapTheme(next === 'dark' ? 'dark' : 'voyager');
       }
+    }
+
+    /* ----------------------------------------------------------------------
+       RUNTIME CONFIG — map key, demo mode, honest default states
+       ---------------------------------------------------------------------- */
+    _bindRuntimeConfigControls() {
+      const cfg = window.RadiaConfig;
+      this._applyDemoVisibility();
+      if (!cfg) return;
+
+      const keyInput = document.getElementById('input-maptiler-key');
+      const keyStatus = document.getElementById('maptiler-key-status');
+      const saveKeyBtn = document.getElementById('btn-save-maptiler-key');
+
+      const renderKeyStatus = () => {
+        if (!keyStatus) return;
+        keyStatus.textContent = cfg.get('maptilerKey')
+          ? 'Key saved in this browser. All five map styles now use MapTiler imagery.'
+          : 'Leave blank to keep the free tiles. A key is only sent to MapTiler, and it is stored in this browser only.';
+      };
+
+      if (keyInput) keyInput.value = cfg.get('maptilerKey') || '';
+      renderKeyStatus();
+
+      if (saveKeyBtn) {
+        saveKeyBtn.addEventListener('click', () => {
+          cfg.set('maptilerKey', (keyInput && keyInput.value.trim()) || '');
+          renderKeyStatus();
+          if (window.RadiaProximity && typeof window.RadiaProximity._applyTileProvider === 'function') {
+            window.RadiaProximity._applyTileProvider(window.RadiaProximity.mapTheme);
+          }
+          this.showToast(cfg.get('maptilerKey') ? 'Map key saved' : 'Using free map tiles', 'emerald');
+        });
+      }
+
+      const demoToggle = document.getElementById('toggle-demo-mode');
+      if (demoToggle) {
+        demoToggle.checked = !!cfg.get('demoMode');
+        demoToggle.addEventListener('change', () => {
+          cfg.set('demoMode', demoToggle.checked);
+          window.location.reload();
+        });
+      }
+
+      const insightEmptyMap = document.getElementById('btn-insight-empty-map');
+      if (insightEmptyMap) {
+        insightEmptyMap.addEventListener('click', () => this.switchView('view-radar'));
+      }
+    }
+
+    /* ----------------------------------------------------------------------
+       NEARBY PRESENCE — local BroadcastChannel or hosted realtime
+       ---------------------------------------------------------------------- */
+    _bindPresenceControls() {
+      const cfg = window.RadiaConfig;
+      const presence = window.RadiaPresence;
+      if (!cfg) return;
+
+      const statusEl = document.getElementById('presence-status');
+      const hostedFields = document.getElementById('presence-hosted-fields');
+      const urlInput = document.getElementById('input-supabase-url');
+      const keyInput = document.getElementById('input-supabase-anon-key');
+      const saveBtn = document.getElementById('btn-save-presence');
+
+      if (urlInput) urlInput.value = cfg.get('supabaseUrl') || '';
+      if (keyInput) keyInput.value = cfg.get('supabaseAnonKey') || '';
+
+      const setActiveDriver = (driver) => {
+        document.querySelectorAll('.presence-driver-btn').forEach((btn) => {
+          const active = btn.getAttribute('data-presence') === driver;
+          btn.classList.toggle('btn-emerald', active);
+          btn.classList.toggle('btn-glass', !active);
+        });
+        if (hostedFields) hostedFields.classList.toggle('hidden', driver !== 'supabase');
+      };
+
+      const renderStatus = () => {
+        if (!statusEl || !presence) return;
+        const driver = presence.driver;
+        if (driver === 'off') {
+          statusEl.textContent = 'Only you on the map.';
+        } else if (presence.status === 'live' && driver === 'local') {
+          statusEl.textContent = 'Live on this machine. Open a second tab or window to see another person appear.';
+        } else if (presence.status === 'live') {
+          statusEl.textContent = 'Connected to your hosted channel. Others in your geohash cell will appear.';
+        } else if (presence.status === 'error') {
+          statusEl.textContent = `Not connected: ${presence.error || 'unknown error'}`;
+        } else {
+          statusEl.textContent = 'Connecting…';
+        }
+      };
+
+      setActiveDriver(presence ? presence.driver : (cfg.get('presenceDriver') || 'off'));
+      renderStatus();
+
+      window.addEventListener('RADIA_PRESENCE_STATUS', renderStatus);
+
+      document.querySelectorAll('.presence-driver-btn').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const driver = btn.getAttribute('data-presence') || 'off';
+          cfg.set('presenceDriver', driver);
+          setActiveDriver(driver);
+          if (presence) {
+            presence.start(driver);
+            setTimeout(renderStatus, 60);
+          }
+        });
+      });
+
+      if (saveBtn) {
+        saveBtn.addEventListener('click', () => {
+          cfg.set('supabaseUrl', (urlInput && urlInput.value.trim()) || '');
+          cfg.set('supabaseAnonKey', (keyInput && keyInput.value.trim()) || '');
+          cfg.set('presenceDriver', 'supabase');
+          setActiveDriver('supabase');
+          if (presence) presence.start('supabase');
+          setTimeout(renderStatus, 80);
+          this.showToast('Presence settings saved', 'emerald');
+        });
+      }
+
+      // Resume a previously chosen transport on load.
+      if (presence) {
+        const saved = cfg.get('presenceDriver') || 'off';
+        if (saved !== 'off') setTimeout(() => presence.start(saved), 1200);
+      }
+    }
+
+    /* ----------------------------------------------------------------------
+       THE VOID — solar insight graph
+       One star at the top. Every insight is a small star beneath it, joined
+       by a thread that carries light back into the centre. No legend, no
+       labels until you ask for one.
+       ---------------------------------------------------------------------- */
+
+    _solarColors() {
+      return {
+        changed: '#e8996d',
+        learned: '#7fc3a8',
+        reached: '#9db8c2',
+        hub: '#a9e6c8',
+        label: 'rgba(234, 242, 236, 0.80)',
+        sub: 'rgba(234, 242, 236, 0.44)',
+        dust: '228, 238, 230'
+      };
+    }
+
+    _solarReasonFor(entry, i) {
+      const c = String(entry.category || '').toLowerCase();
+      if (/vuln|human|identity|fear|loss/.test(c)) return 'changed';
+      if (/observ|curio|learn|question/.test(c)) return 'learned';
+      if (/mutual|connect|people|reach/.test(c)) return 'reached';
+      return ['changed', 'learned', 'reached'][i % 3];
+    }
+
+    /* One star at the top, one quiet ring of insight-stars beneath it.
+       Everything else is empty sky on purpose. */
+    _solarLayout(W, H, entries) {
+      const colors = this._solarColors();
+      const narrow = W < 520;
+      const list = entries || [];
+      const shown = list.slice(0, 8);
+
+      const hub = { x: W / 2, y: H * (narrow ? 0.36 : 0.32) };
+      const rx = narrow ? W * 0.33 : Math.min(W * 0.31, 272);
+      const ry = narrow ? H * 0.23 : H * 0.27;
+
+      // An even fan under the star: no overlap, no grouping clutter.
+      const anglesFor = (n) => {
+        if (n <= 1) return [90];
+        const span = n === 2 ? 54 : 104;
+        const start = 90 - span / 2;
+        const step = span / (n - 1);
+        return Array.from({ length: n }, (_, i) => start + step * i);
+      };
+
+      const t = performance.now() / 1000;
+      const baseAngles = anglesFor(shown.length);
+      const nodes = shown.map((entry, i) => {
+        const key = this._solarReasonFor(entry, i);
+        const drift = Math.sin(t * 0.20 + i * 1.7) * 2.1;
+        const angle = baseAngles[i] + drift;
+        const rad = (angle * Math.PI) / 180;
+        const depth = 1 + Math.sin(t * 0.44 + i * 0.9) * 0.012;
+        return {
+          x: hub.x + Math.cos(rad) * rx * depth,
+          y: hub.y + Math.sin(rad) * ry * depth,
+          r: narrow ? 5 : 5.6,
+          key,
+          color: colors[key],
+          entry
+        };
+      });
+
+      return { hub, nodes, colors, narrow, rx, ry, count: list.length };
+    }
+
+    _drawSolarGraph(ctx, W, H, entries) {
+      const TAU = Math.PI * 2;
+      const t = performance.now() / 1000;
+      const layout = this._solarLayout(W, H, entries || []);
+      const { hub, rx, ry, colors } = layout;
+      this._solarNodes = layout.nodes;
+      this._solarPositions = [hub];
+      this._solarReasonY = hub.y;
+
+      const tint = (hex, a) => {
+        const n = parseInt(hex.slice(1), 16);
+        return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+      };
+
+      /* Dust: fixed positions, breathing light. */
+      const rand = (n) => {
+        const x = Math.sin(n * 127.1) * 43758.5453;
+        return x - Math.floor(x);
+      };
+      for (let i = 0; i < 44; i++) {
+        const dx = rand(i + 1) * W;
+        const dy = rand(i + 71) * H;
+        const alpha = 0.035 + 0.085 * (0.5 + 0.5 * Math.sin(t * 0.6 + i * 1.7));
+        ctx.fillStyle = `rgba(${colors.dust}, ${alpha.toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(dx, dy, rand(i + 31) > 0.9 ? 1.5 : 0.85, 0, TAU);
+        ctx.fill();
+      }
+
+      /* Gravity: slow rings leaving the star, so the system feels alive. */
+      for (let k = 0; k < 2; k++) {
+        const p = (t * 0.07 + k / 2) % 1;
+        ctx.strokeStyle = `rgba(169, 230, 200, ${((1 - p) * (1 - p) * 0.09).toFixed(3)})`;
+        ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        ctx.ellipse(hub.x, hub.y, Math.max(2, rx * p), Math.max(2, ry * p), 0, 0, TAU);
+        ctx.stroke();
+      }
+
+      /* One orbit line the insight-stars sit on. */
+      if (layout.nodes.length) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(169, 230, 200, 0.10)';
+        ctx.lineWidth = 0.8;
+        ctx.setLineDash([2, 9]);
+        ctx.beginPath();
+        ctx.ellipse(hub.x, hub.y, rx, ry, 0, 0.10, Math.PI - 0.10);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      /* Light threads, bowed so they never look like a chart. */
+      layout.nodes.forEach((n, i) => {
+        const dx = n.x - hub.x;
+        const dy = n.y - hub.y;
+        const len = Math.hypot(dx, dy) || 1;
+        const bow = 12 + (i % 3) * 5;
+        n.cx = (hub.x + n.x) / 2 + (dy / len) * bow;
+        n.cy = (hub.y + n.y) / 2 - (dx / len) * bow;
+
+        const active = this.solarSelected === n.entry || this.solarHovered === n.entry;
+        const dim = this.solarSelected && !active ? 0.32 : 1;
+        const thread = ctx.createLinearGradient(hub.x, hub.y, n.x, n.y);
+        thread.addColorStop(0, `rgba(196, 246, 220, ${(active ? 0.62 : 0.30) * dim})`);
+        thread.addColorStop(0.55, `rgba(196, 246, 220, ${(active ? 0.24 : 0.09) * dim})`);
+        thread.addColorStop(1, tint(n.color, (active ? 0.34 : 0.06) * dim));
+
+        ctx.strokeStyle = thread;
+        ctx.lineWidth = active ? 1.3 : 0.85;
+        ctx.beginPath();
+        ctx.moveTo(hub.x, hub.y);
+        ctx.quadraticCurveTo(n.cx, n.cy, n.x, n.y);
+        ctx.stroke();
+      });
+
+      /* A pulse of light travels each thread into the star. */
+      layout.nodes.forEach((n, i) => {
+        if (this.solarSelected && this.solarSelected !== n.entry) return;
+        const p = (t * (0.15 + (i % 3) * 0.015) + i * 0.19) % 1;
+        const q = p * p * (3 - 2 * p);
+        const mx = (1 - q) * (1 - q) * n.x + 2 * (1 - q) * q * n.cx + q * q * hub.x;
+        const my = (1 - q) * (1 - q) * n.y + 2 * (1 - q) * q * n.cy + q * q * hub.y;
+        const life = Math.sin(Math.PI * p);
+
+        const glow = ctx.createRadialGradient(mx, my, 0, mx, my, 5.5);
+        glow.addColorStop(0, tint(n.color, 0.55 * life));
+        glow.addColorStop(1, tint(n.color, 0));
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(mx, my, 5.5, 0, TAU);
+        ctx.fill();
+
+        ctx.fillStyle = `rgba(255, 255, 255, ${(0.62 * life).toFixed(3)})`;
+        ctx.beginPath();
+        ctx.arc(mx, my, 1.1, 0, TAU);
+        ctx.fill();
+      });
+
+      /* The star itself. */
+      const core = layout.narrow ? 12.5 : 14.5;
+      const breathe = 1 + 0.035 * Math.sin(t * 1.05);
+      const glowR = (layout.narrow ? 78 : 98) * breathe;
+
+      const glow = ctx.createRadialGradient(hub.x, hub.y, 0, hub.x, hub.y, glowR);
+      glow.addColorStop(0, 'rgba(182, 245, 213, 0.55)');
+      glow.addColorStop(0.34, 'rgba(128, 206, 174, 0.19)');
+      glow.addColorStop(1, 'rgba(128, 206, 174, 0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(hub.x, hub.y, glowR, 0, TAU);
+      ctx.fill();
+
+      // A thin ring, and a moon that takes its time.
+      ctx.strokeStyle = 'rgba(196, 246, 220, 0.16)';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.arc(hub.x, hub.y, core + 12, 0, TAU);
+      ctx.stroke();
+
+      ctx.save();
+      ctx.translate(hub.x, hub.y);
+      ctx.rotate(t * 0.14);
+      const ringRx = core + 27;
+      ctx.strokeStyle = 'rgba(196, 246, 220, 0.26)';
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, ringRx, ringRx * 0.34, 0, 0, TAU);
+      ctx.stroke();
+      const ma = t * 0.55;
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.82)';
+      ctx.beginPath();
+      ctx.arc(Math.cos(ma) * ringRx, Math.sin(ma) * ringRx * 0.34, 1.5, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+
+      // Core, with a soft cross of light.
+      const coreGrad = ctx.createRadialGradient(hub.x - core * 0.3, hub.y - core * 0.32, 1, hub.x, hub.y, core);
+      coreGrad.addColorStop(0, '#ffffff');
+      coreGrad.addColorStop(0.48, '#dff8ea');
+      coreGrad.addColorStop(1, '#8fd6b4');
+      ctx.fillStyle = coreGrad;
+      ctx.beginPath();
+      ctx.arc(hub.x, hub.y, core, 0, TAU);
+      ctx.fill();
+
+      ctx.save();
+      ctx.translate(hub.x, hub.y);
+      ctx.globalCompositeOperation = 'lighter';
+      const arm = core * (2.8 + 0.1 * Math.sin(t * 1.4));
+      const flare = ctx.createRadialGradient(0, 0, core * 0.6, 0, 0, arm);
+      flare.addColorStop(0, 'rgba(255, 255, 255, 0.32)');
+      flare.addColorStop(1, 'rgba(255, 255, 255, 0)');
+      ctx.fillStyle = flare;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, arm, 1.9, 0, 0, TAU);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 1.9, arm * 0.78, 0, 0, TAU);
+      ctx.fill();
+      ctx.restore();
+
+      /* Insight-stars: small, quiet, and only loud when you ask. */
+      layout.nodes.forEach((n, i) => {
+        const selected = this.solarSelected === n.entry;
+        const hovered = this.solarHovered === n.entry;
+        const dimmed = !!this.solarSelected && !selected;
+        const twinkle = (0.74 + 0.26 * Math.sin(t * 0.85 + i * 1.9)) * (dimmed ? 0.45 : 1);
+        const r = selected || hovered ? n.r + 2.1 : n.r;
+        const haloR = selected ? 38 : hovered ? 28 : dimmed ? 12 : 17;
+
+        const halo = ctx.createRadialGradient(n.x, n.y, 0, n.x, n.y, haloR);
+        halo.addColorStop(0, tint(n.color, selected ? 0.52 : hovered ? 0.40 : dimmed ? 0.06 : 0.15));
+        halo.addColorStop(1, tint(n.color, 0));
+        ctx.fillStyle = halo;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, haloR, 0, TAU);
+        ctx.fill();
+
+        ctx.globalAlpha = selected || hovered ? 1 : twinkle;
+        ctx.fillStyle = n.color;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, r, 0, TAU);
+        ctx.fill();
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.94)';
+        ctx.beginPath();
+        ctx.arc(n.x - r * 0.18, n.y - r * 0.22, r * 0.34, 0, TAU);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+
+        if (selected) {
+          const ring = 5 + (Math.sin(t * 2.1) * 0.5 + 0.5) * 5;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.46)';
+          ctx.lineWidth = 0.9;
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, n.r + ring, 0, TAU);
+          ctx.stroke();
+
+          ctx.textAlign = 'center';
+          ctx.font = '500 10px "Instrument Sans", sans-serif';
+          ctx.fillStyle = colors.label;
+          ctx.fillText(n.entry.partnerAlias || 'Someone', n.x, n.y + n.r + 17);
+        }
+      });
+    }
+
+    _solarHitTest(evt) {
+      const canvas = document.getElementById('insight-constellation-canvas');
+      if (!canvas || !this._solarNodes || !this._solarNodes.length) return null;
+      const rect = canvas.getBoundingClientRect();
+      const W = rect.width || 1;
+      const H = rect.height || 1;
+      // Inverse of: screen = (world - centre) * scale + centre + offset
+      const x = ((evt.clientX - rect.left) - W / 2 - this.graphTransform.offsetX) / this.graphTransform.scale + W / 2;
+      const y = ((evt.clientY - rect.top) - H / 2 - this.graphTransform.offsetY) / this.graphTransform.scale + H / 2;
+
+      let best = null;
+      let bestDist = 20;
+      this._solarNodes.forEach((n) => {
+        const d = Math.hypot(n.x - x, n.y - y);
+        if (d < bestDist) { bestDist = d; best = n; }
+      });
+      return best;
+    }
+
+    _showSolarSheet(entry) {
+      const box = document.getElementById('constellation-node-inspector');
+      if (!box) return;
+
+      if (!entry) {
+        box.classList.add('hidden');
+        box.innerHTML = '';
+        return;
+      }
+
+      const esc = (value) => String(value == null ? '' : value)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+
+      const spot = entry.locationSpot;
+      const place = (spot && (spot.name || spot.label)) || 'Nearby';
+      const when = entry.timestamp
+        ? new Date(entry.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+        : '';
+
+      box.innerHTML = `
+        <button type="button" class="void-sheet-close" aria-label="Close">×</button>
+        <div class="void-sheet-meta">${esc(entry.partnerAlias || 'Someone')} · ${esc(place)}${when ? ' · ' + esc(when) : ''}</div>
+        <h3>${esc(entry.promptText || 'A conversation that stayed with you')}</h3>
+        <div class="void-pair">
+          ${entry.mySharedInsight ? `<div class="void-quote"><span>You</span>${esc(entry.mySharedInsight)}</div>` : ''}
+          ${entry.partnerSharedInsight ? `<div class="void-quote"><span>Them</span>${esc(entry.partnerSharedInsight)}</div>` : ''}
+        </div>`;
+
+      box.classList.remove('hidden');
+      // The sheet sits under the sky, which can push it behind the dock on a phone.
+      requestAnimationFrame(() => {
+        const view = document.getElementById('view-reflections');
+        if (!view) return;
+        const overflow = box.getBoundingClientRect().bottom - (window.innerHeight - 96);
+        if (overflow > 0) {
+          view.scrollTo({ top: view.scrollTop + overflow + 8, behavior: 'smooth' });
+        }
+      });
+      const close = box.querySelector('.void-sheet-close');
+      if (close) {
+        close.addEventListener('click', () => {
+          this.solarSelected = null;
+          this._showSolarSheet(null);
+        });
+      }
+    }
+
+    _bindInsightsChrome() {
+      const canvas = document.getElementById('insight-constellation-canvas');
+      const tooltip = document.getElementById('constellation-hover-tooltip');
+
+      if (canvas && !this._solarBound) {
+        this._solarBound = true;
+
+        canvas.addEventListener('click', (evt) => {
+          const hit = this._solarHitTest(evt);
+          this.solarSelected = hit ? hit.entry : null;
+          this._showSolarSheet(hit ? hit.entry : null);
+          // A finger leaves no hover state behind.
+          if (tooltip) tooltip.classList.remove('visible');
+          this.solarHovered = null;
+        });
+
+        canvas.addEventListener('mousemove', (evt) => {
+          const hit = this._solarHitTest(evt);
+          this.solarHovered = hit ? hit.entry : null;
+          canvas.style.cursor = hit ? 'pointer' : 'grab';
+          if (!tooltip) return;
+          if (!hit) {
+            tooltip.classList.remove('visible');
+            return;
+          }
+          const spot = hit.entry.locationSpot;
+          const place = (spot && (spot.name || spot.label)) || 'Nearby';
+          tooltip.textContent = `${hit.entry.partnerAlias || 'Someone'} · ${place}`;
+          tooltip.style.left = `${evt.clientX + 12}px`;
+          tooltip.style.top = `${evt.clientY - 34}px`;
+          tooltip.classList.add('visible');
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+          this.solarHovered = null;
+          if (tooltip) tooltip.classList.remove('visible');
+        });
+      }
+
+      const menuBtn = document.getElementById('btn-insights-menu');
+      const menu = document.getElementById('insights-menu');
+      if (menuBtn && menu && !menuBtn.dataset.bound) {
+        menuBtn.dataset.bound = 'true';
+        menuBtn.addEventListener('click', (evt) => {
+          evt.stopPropagation();
+          const willOpen = menu.classList.contains('hidden');
+          menu.classList.toggle('hidden', !willOpen);
+          menuBtn.setAttribute('aria-expanded', String(willOpen));
+        });
+        menu.addEventListener('click', (evt) => evt.stopPropagation());
+        document.addEventListener('click', () => {
+          menu.classList.add('hidden');
+          menuBtn.setAttribute('aria-expanded', 'false');
+        });
+      }
+
+      const journalBtn = document.getElementById('btn-toggle-journal');
+      const journalPanel = document.getElementById('journal-panel');
+      if (journalBtn && journalPanel && !journalBtn.dataset.bound) {
+        journalBtn.dataset.bound = 'true';
+        journalBtn.addEventListener('click', () => {
+          const willOpen = journalPanel.classList.contains('hidden');
+          journalPanel.classList.toggle('hidden', !willOpen);
+          journalBtn.setAttribute('aria-expanded', String(willOpen));
+        });
+      }
+
+      const collectionBtn = document.getElementById('btn-toggle-collection');
+      const collection = document.getElementById('activity-collection');
+      if (collectionBtn && collection && !collectionBtn.dataset.bound) {
+        collectionBtn.dataset.bound = 'true';
+        collectionBtn.addEventListener('click', () => {
+          const willOpen = collection.classList.contains('hidden');
+          collection.classList.toggle('hidden', !willOpen);
+          collectionBtn.classList.toggle('open', willOpen);
+          collectionBtn.setAttribute('aria-expanded', String(willOpen));
+        });
+      }
+    }
+
+    _applyDemoVisibility() {
+      const demo = !!(window.RadiaConfig && window.RadiaConfig.get('demoMode'));
+      const wrap = document.getElementById('radar-demo-controls');
+      if (wrap) wrap.classList.toggle('hidden', !demo);
+      const sampleBtn = document.getElementById('btn-plant-sample-insight');
+      if (sampleBtn) sampleBtn.classList.toggle('hidden', !demo);
+      document.documentElement.classList.toggle('demo-mode', demo);
     }
 
     _bindKeyboardAndBackdropDismissal() {
@@ -1027,14 +1586,25 @@
       const dockBadge = document.getElementById('dock-insight-badge');
       if (dockBadge) {
         dockBadge.textContent = String(entries.length);
+        // A zero badge is noise: only surface the count once there is something.
+        dockBadge.classList.toggle('hidden', entries.length === 0);
       }
 
-      const milePill = document.getElementById('insight-same-mile-pill');
-      if (milePill) {
-        milePill.textContent = `Same-Mile Cluster: ${spatial.maxSameMileCount} / 10 in 1 Mi`;
-        milePill.className = spatial.sameMileUnlocked
-          ? 'px-2.5 py-1 rounded-full bg-teal-500/15 border border-teal-500/35 text-[10px] font-bold text-teal-700'
-          : 'px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-500/35 text-[10px] font-bold text-amber-700';
+      // With no real insights there is nothing to synthesise, so show the empty
+      // state instead of a graph full of invented pillars.
+      const emptyInsights = document.getElementById('insight-empty-state');
+      if (emptyInsights) emptyInsights.classList.toggle('hidden', entries.length > 0);
+      // The sky itself stays: three reason-stars with nothing beneath them is
+      // an honest picture of an empty graph, not invented content.
+      document.getElementById('view-reflections')?.classList.toggle('sky-empty', entries.length === 0);
+      const metaCard = document.getElementById('ai-meta-insight-container');
+      if (metaCard) metaCard.classList.toggle('hidden', entries.length === 0);
+
+      const mileCount = document.getElementById('insight-same-mile-count');
+      if (mileCount) mileCount.textContent = String(spatial.maxSameMileCount || 0);
+      const voidCount = document.getElementById('void-count');
+      if (voidCount) {
+        voidCount.textContent = entries.length === 1 ? '1 star' : `${entries.length} stars`;
       }
 
       this._cachedEntries = entries;
@@ -1083,17 +1653,24 @@
       ctx.translate(-cx, -cy);
 
       const isDark = document.documentElement.classList.contains('theme-dark');
-      const textPrimary = isDark ? '#f1f5f9' : '#0f172a';
-      const textMuted = isDark ? '#94a3b8' : '#475569';
-      const accentTeal = isDark ? '#2dd4bf' : '#0d9488';
-      const accentAmber = isDark ? '#fbbf24' : '#d97706';
-      const accentViolet = isDark ? '#a78bfa' : '#7c3aed';
-      const accentSky = isDark ? '#38bdf8' : '#0284c7';
+      // One palette for the graph, matching DESIGN.md: pine, ember, slate-sky.
+      const textPrimary = isDark ? '#edefe9' : '#111a17';
+      const textMuted = isDark ? '#8d9a91' : '#6c7a73';
+      const accentTeal = isDark ? '#7fc3a8' : '#0b4f3f';
+      const accentAmber = isDark ? '#e8996d' : '#c2552a';
+      const accentViolet = isDark ? '#9db8c2' : '#3c6e86';
+      const accentSky = isDark ? '#9db8c2' : '#3c6e86';
 
       const entries = (this._cachedEntries || []).slice(0, 12);
       const meta = this._cachedMeta || {};
       const spatial = this._cachedSpatial || { maxSameMileCount: entries.length };
       this.constellationNodes = [];
+
+      // Default view: the void. Three reason-stars, quiet orbiting insights.
+      if (this.graphMode !== 'spatial' && this.graphMode !== 'constellation') {
+        this._drawSolarGraph(ctx, W, H, entries);
+        return;
+      }
 
       if (this.graphMode === 'spatial') {
         this._drawSpatialSameMileMode(ctx, W, H, entries, spatial, isDark, textPrimary, accentTeal, accentAmber);
@@ -1118,7 +1695,7 @@
         ctx.setLineDash([]);
 
         ctx.fillStyle = textMuted;
-        ctx.font = '700 9.5px "Plus Jakarta Sans", sans-serif';
+        ctx.font = '700 9.5px "Instrument Sans", sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(`SAME 1-MILE NEIGHBORHOOD CLUSTER (${spatial.maxSameMileCount}/10 IN MILE)`, cx, rootY + 25);
 
@@ -1233,7 +1810,7 @@
 
           const spotShort = entry.locationSpot ? entry.locationSpot.name.split(' ')[0] : 'Park';
           ctx.fillStyle = textPrimary;
-          ctx.font = `${isSelected ? '800' : '600'} 9.5px "Plus Jakarta Sans", sans-serif`;
+          ctx.font = `${isSelected ? '800' : '600'} 9.5px "Instrument Sans", sans-serif`;
           ctx.textAlign = 'center';
           ctx.fillText(`${entry.partnerAlias} • ${spotShort}`, myX, myY + 19);
 
@@ -1289,7 +1866,7 @@
           ctx.stroke();
 
           ctx.fillStyle = textPrimary;
-          ctx.font = '800 9.5px "Plus Jakarta Sans", sans-serif';
+          ctx.font = '800 9.5px "Instrument Sans", sans-serif';
           ctx.textAlign = 'center';
           ctx.fillText(an.label, an.x, an.y - (r + 8));
 
@@ -1352,7 +1929,7 @@
 
           const spotShort = entry.locationSpot ? entry.locationSpot.name.split(' ')[0] : 'Park';
           ctx.fillStyle = textPrimary;
-          ctx.font = '700 9.5px "Plus Jakarta Sans", sans-serif';
+          ctx.font = '700 9.5px "Instrument Sans", sans-serif';
           ctx.textAlign = 'center';
           ctx.fillText(`${entry.partnerAlias} • ${spotShort}`, myX, myY + 18);
 
@@ -1375,7 +1952,7 @@
         ctx.stroke();
 
         ctx.fillStyle = textPrimary;
-        ctx.font = '800 10px "Plus Jakarta Sans", sans-serif';
+        ctx.font = '800 10px "Instrument Sans", sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText('AI SYNTHESIS CORE', cx, cy - 17);
 
@@ -1414,7 +1991,7 @@
       ctx.restore();
 
       ctx.fillStyle = textPrimary;
-      ctx.font = '800 10.5px "Plus Jakarta Sans", sans-serif';
+      ctx.font = '800 10.5px "Instrument Sans", sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(`1.0-MILE SPATIAL CORRELATION MAP (${spatial.maxSameMileCount} / 10 IN SAME MILE)`, cx, 28);
 
@@ -1452,7 +2029,7 @@
         ctx.stroke();
 
         ctx.fillStyle = textPrimary;
-        ctx.font = '700 9.5px "Plus Jakarta Sans", sans-serif';
+        ctx.font = '700 9.5px "Instrument Sans", sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(`${spotName} (${p.entry.partnerAlias})`, p.x, p.y + 18);
 
