@@ -1,136 +1,240 @@
 /* ==========================================================================
-   RADIA — ENCOUNTER, CATALYST, AND PROGRESSION STYLING
+   RADIA — ENCOUNTER, INSIGHT NETWORK GRAPH & MILESTONE STYLING
+   (css/encounter.css)
    ========================================================================== */
 
-/* 1. Dynamic Avatar Auras (Progression Ranks) */
-.aura-tier-1 {
-  box-shadow: 0 0 0 2px var(--color-emerald-glow), 0 0 15px rgba(16, 185, 129, 0.4);
-}
+/* 1. Profile Ring Accents */
+.aura-tier-1 { --avatar-primary: #0d9488; --avatar-accent: #10b981; }
+.aura-tier-2 { --avatar-primary: #d97706; --avatar-accent: #f59e0b; }
+.aura-tier-3 { --avatar-primary: #0284c7; --avatar-accent: #6366f1; }
+.aura-tier-4 { --avatar-primary: #7c3aed; --avatar-accent: #ec4899; }
 
-.aura-tier-2 {
-  box-shadow: 0 0 0 2px var(--color-amber-glow), 0 0 20px rgba(245, 158, 11, 0.5);
-  animation: aura-pulse-amber 3s infinite alternate ease-in-out;
-}
-
-.aura-tier-3 {
-  box-shadow: 0 0 0 3px #8b5cf6, 0 0 25px rgba(139, 92, 246, 0.6);
-  animation: aura-pulse-violet 2.5s infinite alternate ease-in-out;
-}
-
-.aura-tier-4 {
-  background: linear-gradient(135deg, #10b981, #f59e0b, #8b5cf6);
-  box-shadow: 0 0 0 3px #08090c, 0 0 30px rgba(16, 185, 129, 0.8);
-  animation: aura-rotate-rainbow 4s linear infinite;
-}
-
-@keyframes aura-pulse-amber {
-  0% { box-shadow: 0 0 0 2px var(--color-amber-glow), 0 0 12px rgba(245, 158, 11, 0.3); }
-  100% { box-shadow: 0 0 0 3px var(--color-amber-glow), 0 0 24px rgba(245, 158, 11, 0.7); }
-}
-
-@keyframes aura-pulse-violet {
-  0% { box-shadow: 0 0 0 2px #8b5cf6, 0 0 14px rgba(139, 92, 246, 0.3); }
-  100% { box-shadow: 0 0 0 4px #8b5cf6, 0 0 28px rgba(139, 92, 246, 0.75); }
-}
-
-@keyframes aura-rotate-rainbow {
-  0% { filter: hue-rotate(0deg); }
-  100% { filter: hue-rotate(360deg); }
-}
-
-/* 2. Collision Identity Card Glow & Animation */
+/* 2. Collision Identity Ping Modal */
 #modal-collision .modal-card {
-  border-top: 1px solid rgba(16, 185, 129, 0.3);
-  box-shadow: 0 -10px 40px -10px rgba(16, 185, 129, 0.25);
+  border-top: 2px solid #0d9488;
 }
 
-.collision-avatar-pulse {
+.collision-avatar-ring {
   position: relative;
-}
-
-.collision-avatar-pulse::after {
-  content: '';
-  position: absolute;
-  inset: -6px;
   border-radius: 20px;
-  border: 2px solid var(--color-emerald-glow);
-  opacity: 0.6;
-  animation: ping-avatar 2s cubic-bezier(0, 0, 0.2, 1) infinite;
-}
-
-@keyframes ping-avatar {
-  75%, 100% {
-    transform: scale(1.25);
-    opacity: 0;
-  }
+  padding: 2px;
+  background: linear-gradient(135deg, #0d9488, #0284c7);
 }
 
 /* 3. Catalyst Conversation View */
 #catalyst-prompt-text {
-  font-family: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
-  line-height: 1.5;
-  letter-spacing: -0.01em;
-  color: #f1f5f9;
-  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
-}
-
-.catalyst-timer-ring {
-  transition: stroke-dashoffset 1s linear, stroke 0.4s ease;
-}
-
-.catalyst-timer-warning {
-  stroke: var(--color-amber-glow) !important;
-  animation: timer-pulse 1s infinite alternate;
-}
-
-@keyframes timer-pulse {
-  0% { filter: drop-shadow(0 0 2px rgba(245, 158, 11, 0.4)); }
-  100% { filter: drop-shadow(0 0 8px rgba(245, 158, 11, 0.8)); }
+  font-family: 'Newsreader', Georgia, Cambria, serif !important;
+  line-height: 1.42;
+  letter-spacing: -0.015em;
+  color: var(--text-primary);
 }
 
 /* 4. 3-Tier Post-Encounter Safety Buttons */
 .feedback-rating-btn {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid var(--border-glass);
+  transition: all 0.18s ease;
+  border: 1px solid var(--border-strong) !important;
+  background: var(--bg-subtle) !important;
+  color: var(--text-secondary) !important;
 }
 
 .feedback-rating-btn.selected[data-rating="1"] {
-  background: rgba(16, 185, 129, 0.15);
-  border-color: var(--color-emerald-glow);
-  color: #a7f3d0;
-  box-shadow: 0 0 15px -3px rgba(16, 185, 129, 0.4);
+  background: rgba(13, 148, 136, 0.12) !important;
+  border-color: #0d9488 !important;
+  color: #0f766e !important;
+  box-shadow: 0 2px 10px rgba(13, 148, 136, 0.18);
 }
 
 .feedback-rating-btn.selected[data-rating="0"] {
-  background: rgba(148, 163, 184, 0.15);
-  border-color: #94a3b8;
-  color: #f8fafc;
-  box-shadow: 0 0 15px -3px rgba(148, 163, 184, 0.3);
+  background: rgba(100, 116, 139, 0.14) !important;
+  border-color: #475569 !important;
+  color: var(--text-primary) !important;
 }
 
 .feedback-rating-btn.selected[data-rating="-1"] {
-  background: rgba(239, 68, 68, 0.15);
-  border-color: var(--color-danger);
-  color: #fca5a5;
-  box-shadow: 0 0 15px -3px rgba(239, 68, 68, 0.4);
+  background: rgba(225, 29, 72, 0.1) !important;
+  border-color: #e11d48 !important;
+  color: #be123c !important;
 }
 
-/* 5. Sub-prompt chips inside journal box */
+/* 5. Sub-Prompt Reflection Chips */
 .subprompt-chip {
-  display: inline-block;
-  padding: 4px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
   border-radius: 9999px;
   font-size: 11px;
-  background: rgba(30, 41, 59, 0.7);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  color: #94a3b8;
+  font-weight: 600;
+  background: var(--bg-subtle) !important;
+  border: 1px solid var(--border-strong) !important;
+  color: var(--text-secondary) !important;
   cursor: pointer;
   transition: all 0.15s ease;
-  user-select: none;
 }
 
-.subprompt-chip:active {
-  transform: scale(0.95);
-  background: rgba(16, 185, 129, 0.2);
-  color: #a7f3d0;
+.subprompt-chip:hover,
+.subprompt-chip.active {
+  background: rgba(13, 148, 136, 0.12) !important;
+  border-color: #0d9488 !important;
+  color: #0f766e !important;
+}
+
+/* 6. Interactive Insight Network Graph & Growth Tree Stage */
+.constellation-stage {
+  position: relative;
+  width: 100%;
+  height: 430px;
+  min-height: 400px;
+  border-radius: 20px;
+  overflow: hidden;
+  background: radial-gradient(circle at 50% 18%, rgba(13, 148, 136, 0.08), transparent 60%),
+              linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border: 1px solid var(--border-strong);
+  box-shadow: inset 0 1px 3px rgba(15, 23, 42, 0.04);
+  transition: height 0.28s var(--ease-spring);
+}
+
+html.theme-dark .constellation-stage {
+  background: linear-gradient(180deg, #0f172a 0%, #111c2d 60%, #0f1e26 100%);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.constellation-stage.stage-expanded {
+  height: 600px;
+}
+
+#insight-constellation-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: grab;
+  touch-action: none;
+}
+
+#insight-constellation-canvas:active {
+  cursor: grabbing;
+}
+
+/* On-Stage Graph Zoom & Reset Controls */
+.graph-zoom-controls {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-strong);
+  box-shadow: var(--shadow-floating);
+  backdrop-filter: blur(12px);
+}
+
+#map-entity-inspector {
+  max-height: 32vh;
+  overflow-y: auto;
+}
+
+/* Floating Node Hover Tooltip */
+#constellation-hover-tooltip {
+  position: absolute;
+  z-index: 20;
+  pointer-events: none;
+  max-width: 240px;
+  padding: 8px 11px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.92);
+  color: #f8fafc;
+  border: 1px solid rgba(45, 212, 191, 0.45);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.28);
+  font-size: 11px;
+  line-height: 1.35;
+  opacity: 0;
+  transform: translate(-50%, -112%) scale(0.96);
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+
+#constellation-hover-tooltip.tooltip-visible {
+  opacity: 1;
+  transform: translate(-50%, -118%) scale(1);
+}
+
+/* Executive AI Synthesis Card */
+.meta-insight-card {
+  position: relative;
+  border-radius: 20px;
+  background: var(--bg-card-solid);
+  border: 1px solid rgba(13, 148, 136, 0.28);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+
+/* Spatial Milestone Cards */
+.achievement-card {
+  position: relative;
+  border-radius: 16px;
+  padding: 13px;
+  background: var(--bg-card-solid);
+  border: 1px solid var(--border-subtle);
+  box-shadow: var(--shadow-card);
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.achievement-card.unlocked {
+  border-color: rgba(13, 148, 136, 0.45);
+  background: linear-gradient(180deg, rgba(13, 148, 136, 0.04) 0%, var(--bg-card-solid) 100%);
+}
+
+.achievement-card.locked {
+  opacity: 0.72;
+}
+
+/* Mutual Insight Pair Card */
+.mutual-insight-pair {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 520px) {
+  .mutual-insight-pair {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+.insight-bubble-mine {
+  background: rgba(13, 148, 136, 0.07);
+  border: 1px solid rgba(13, 148, 136, 0.28);
+  border-radius: 14px;
+  padding: 11px 13px;
+}
+
+.insight-bubble-partner {
+  background: rgba(79, 70, 229, 0.06);
+  border: 1px solid rgba(79, 70, 229, 0.24);
+  border-radius: 14px;
+  padding: 11px 13px;
+}
+
+/* Walking Milestone Track */
+.milestone-track-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(175px, 1fr));
+  gap: 10px;
+}
+
+.milestone-node {
+  position: relative;
+  border-radius: 14px;
+  padding: 11px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+  transition: all 0.2s ease;
+}
+
+.milestone-node.reached {
+  background: rgba(13, 148, 136, 0.08);
+  border-color: rgba(13, 148, 136, 0.45);
 }

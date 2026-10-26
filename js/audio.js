@@ -1,8 +1,16 @@
 /**
  * ============================================================================
- * RADIA — AUDIO & HAPTICS ENGINE (js/audio.js)
- * Pure procedural Web Audio API synthesizer & synchronized haptic feedback.
- * Zero external MP3/WAV dependencies — 100% GitHub Pages & PWA ready.
+ * RADIA — PROCEDURAL WEB AUDIO & HAPTICS ENGINE (js/audio.js)
+ * ----------------------------------------------------------------------------
+ *  • Pure procedural Web Audio API synthesizer & synchronized haptic feedback.
+ *  • Zero external MP3/WAV dependencies — 100% static/PWA ready.
+ *  • Includes acoustic cues for:
+ *      1. Collision Ping (~40ft / Sprawl Bubble encounter trigger)
+ *      2. Timer Tick & Timer Complete Chime
+ *      3. Mutual Match Ascending Arpeggio
+ *      4. Reflection & Insight Network Node Link Chime
+ *      5. Community Hub Check-In & Field Credit Chime
+ *      6. Tier Up & Spatial Milestone Unlock Fanfare
  * ============================================================================
  */
 
@@ -13,12 +21,10 @@ class AudioManager {
     this.isUnlocked = false;
     this.hapticsEnabled = true;
 
-    // Master bus nodes
     this.masterGain = null;
     this.reverbConvolver = null;
     this.reverbGain = null;
 
-    // Local storage key for persistent mute preferences
     this.STORAGE_KEY_MUTE = 'radia_audio_muted';
     this.STORAGE_KEY_HAPTICS = 'radia_haptics_enabled';
 
@@ -26,85 +32,58 @@ class AudioManager {
     this._initAutoplayUnlock();
   }
 
-  /**
-   * Initialize or retrieve the active AudioContext instance.
-   * Lazily evaluated to respect browser security/autoplay restrictions.
-   */
   _getAudioContext() {
     if (!this.ctx) {
       const AudioContextClass = window.AudioContext || window.webkitAudioContext;
       if (AudioContextClass) {
         this.ctx = new AudioContextClass();
         this._buildMasterBus();
-      } else {
-        console.warn('[Radia Audio] Web Audio API is not supported on this browser.');
       }
     }
-
     if (this.ctx && this.ctx.state === 'suspended') {
-      this.ctx.resume().catch((err) => {
-        console.warn('[Radia Audio] Failed to resume AudioContext:', err);
-      });
+      this.ctx.resume().catch(() => {});
     }
-
     return this.ctx;
   }
 
-  /**
-   * Build the master processing chain including a procedurally generated impulse reverb.
-   */
   _buildMasterBus() {
     if (!this.ctx) return;
 
-    // Master output gain
     this.masterGain = this.ctx.createGain();
-    this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 1, this.ctx.currentTime);
+    this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 0.85, this.ctx.currentTime);
     this.masterGain.connect(this.ctx.destination);
 
-    // Procedural algorithmic reverb channel
     this.reverbGain = this.ctx.createGain();
-    this.reverbGain.gain.setValueAtTime(0.28, this.ctx.currentTime);
+    this.reverbGain.gain.setValueAtTime(0.26, this.ctx.currentTime);
 
     this.reverbConvolver = this.ctx.createConvolver();
-    this.reverbConvolver.buffer = this._generateImpulseResponse(1.8, 2.2);
+    this.reverbConvolver.buffer = this._generateImpulseResponse(1.6, 2.3);
 
     this.reverbConvolver.connect(this.reverbGain);
     this.reverbGain.connect(this.masterGain);
   }
 
-  /**
-   * Synthesizes an algorithmic impulse response buffer for ambient acoustic space.
-   * @param {number} duration - Reverb decay duration in seconds.
-   * @param {number} decay - Exponential decay rate.
-   */
   _generateImpulseResponse(duration, decay) {
     if (!this.ctx) return null;
     const sampleRate = this.ctx.sampleRate;
     const length = Math.floor(sampleRate * duration);
     const impulse = this.ctx.createBuffer(2, length, sampleRate);
-    const leftChannel = impulse.getChannelData(0);
-    const rightChannel = impulse.getChannelData(1);
+    const left = impulse.getChannelData(0);
+    const right = impulse.getChannelData(1);
 
     for (let i = 0; i < length; i++) {
-      const n = i / length;
-      // Exponential decay envelope with subtle stereo variance
-      const envelope = Math.pow(1 - n, decay);
-      leftChannel[i] = (Math.random() * 2 - 1) * envelope;
-      rightChannel[i] = (Math.random() * 2 - 1) * envelope;
+      const env = Math.pow(1 - i / length, decay);
+      left[i] = (Math.random() * 2 - 1) * env;
+      right[i] = (Math.random() * 2 - 1) * env;
     }
-
     return impulse;
   }
 
-  /**
-   * Binds global one-time touch/click listeners to unlock AudioContext.
-   */
   _initAutoplayUnlock() {
     const unlockHandler = () => {
       const ctx = this._getAudioContext();
       if (ctx && ctx.state === 'running') {
         this.isUnlocked = true;
-        // Play a silent buffer tick to guarantee mobile Safari unlock
         const buffer = ctx.createBuffer(1, 1, 22050);
         const source = ctx.createBufferSource();
         source.buffer = buffer;
@@ -122,29 +101,15 @@ class AudioManager {
     window.addEventListener('touchstart', unlockHandler, { passive: true });
   }
 
-  /**
-   * Load saved user preferences from local storage.
-   */
   _loadPreferences() {
     try {
       const savedMute = localStorage.getItem(this.STORAGE_KEY_MUTE);
-      if (savedMute !== null) {
-        this.isMuted = JSON.parse(savedMute);
-      }
-
+      if (savedMute !== null) this.isMuted = JSON.parse(savedMute);
       const savedHaptics = localStorage.getItem(this.STORAGE_KEY_HAPTICS);
-      if (savedHaptics !== null) {
-        this.hapticsEnabled = JSON.parse(savedHaptics);
-      }
-    } catch (e) {
-      console.warn('[Radia Audio] Local storage access error:', e);
-    }
+      if (savedHaptics !== null) this.hapticsEnabled = JSON.parse(savedHaptics);
+    } catch (e) {}
   }
 
-  /**
-   * Toggle global audio mute state.
-   * @returns {boolean} Current muted state.
-   */
   toggleMute() {
     this.isMuted = !this.isMuted;
     try {
@@ -153,16 +118,11 @@ class AudioManager {
 
     if (this.masterGain && this.ctx) {
       this.masterGain.gain.cancelScheduledValues(this.ctx.currentTime);
-      this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 1, this.ctx.currentTime);
+      this.masterGain.gain.setValueAtTime(this.isMuted ? 0 : 0.85, this.ctx.currentTime);
     }
-
     return this.isMuted;
   }
 
-  /**
-   * Toggle mobile haptic feedback.
-   * @returns {boolean} Current haptic state.
-   */
   toggleHaptics() {
     this.hapticsEnabled = !this.hapticsEnabled;
     try {
@@ -171,287 +131,189 @@ class AudioManager {
     return this.hapticsEnabled;
   }
 
-  /**
-   * Safe wrapper around navigator.vibrate
-   * @param {number|number[]} pattern - Millisecond pattern array.
-   */
   _triggerHaptic(pattern) {
     if (!this.hapticsEnabled) return;
     if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
-      try {
-        navigator.vibrate(pattern);
-      } catch (err) {
-        // Ignored if device blocks programmatic vibration
-      }
+      try { navigator.vibrate(pattern); } catch (e) {}
     }
   }
 
-  /* ==========================================================================
-     PROCEDURAL SOUNDSCAPES & HARMONIC GENERATORS
-     ========================================================================== */
-
-  /**
-   * 1. COLLISION PING (~40ft Encounter Trigger)
-   * Atmospheric, binaural low-frequency pulse (120Hz -> 240Hz sweep with subtle stereo panning).
-   */
+  /** 1. COLLISION PING */
   playCollisionPing() {
-    this._triggerHaptic([100, 80, 150]);
+    this._triggerHaptic([90, 60, 140]);
     if (this.isMuted) return;
-
     const ctx = this._getAudioContext();
     if (!ctx) return;
 
     const t = ctx.currentTime;
-
-    // Sub oscillator for visceral physical sensation
-    const osc = ctx.createOscillator();
-    const gain = ctx.createGain();
-    const panner = ctx.createStereoPanner ? ctx.createStereoPanner() : null;
-
-    // Filter to roll off harsh frequencies and maintain a warm aesthetic
-    const filter = ctx.createBiquadFilter();
-    filter.type = 'lowpass';
-    filter.frequency.setValueAtTime(320, t);
-    filter.frequency.exponentialRampToValueAtTime(800, t + 0.4);
-
-    // Pitch sweep: 120Hz -> 240Hz upward swell
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(120, t);
-    osc.frequency.exponentialRampToValueAtTime(240, t + 0.35);
-
-    // Dynamic amplitude envelope (warm swell -> long release)
-    gain.gain.setValueAtTime(0.0001, t);
-    gain.gain.exponentialRampToValueAtTime(0.7, t + 0.12);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.2);
-
-    if (panner) {
-      // Subtle sweep from left-center to centered
-      panner.pan.setValueAtTime(-0.25, t);
-      panner.pan.linearRampToValueAtTime(0.1, t + 0.4);
-      osc.connect(filter);
-      filter.connect(panner);
-      panner.connect(gain);
-    } else {
-      osc.connect(filter);
-      filter.connect(gain);
-    }
-
-    gain.connect(this.masterGain);
-    if (this.reverbConvolver) {
-      gain.connect(this.reverbConvolver);
-    }
-
-    osc.start(t);
-    osc.stop(t + 1.25);
+    const freqs = [261.63, 392.00, 523.25];
+    freqs.forEach((f, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const start = t + idx * 0.07;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(f, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.28, start + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 1.0);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      if (this.reverbConvolver) gain.connect(this.reverbConvolver);
+      osc.start(start);
+      osc.stop(start + 1.05);
+    });
   }
 
-  /**
-   * 2. TIMER TICK (Tactile Countdown Click)
-   * Ultra-quiet, organic woodblock-style transient triggered on final 10 seconds.
-   */
+  /** 2. TIMER TICK */
   playTimerTick() {
-    this._triggerHaptic(20);
+    this._triggerHaptic(15);
     if (this.isMuted) return;
-
     const ctx = this._getAudioContext();
     if (!ctx) return;
 
     const t = ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
-
-    // Woodblock transient: Fast pitch drop from 880Hz -> 220Hz in 35ms
     osc.type = 'triangle';
-    osc.frequency.setValueAtTime(880, t);
-    osc.frequency.exponentialRampToValueAtTime(220, t + 0.035);
-
-    gain.gain.setValueAtTime(0.18, t);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.04);
-
+    osc.frequency.setValueAtTime(840, t);
+    osc.frequency.exponentialRampToValueAtTime(240, t + 0.032);
+    gain.gain.setValueAtTime(0.14, t);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.038);
     osc.connect(gain);
     gain.connect(this.masterGain);
-
     osc.start(t);
-    osc.stop(t + 0.045);
+    osc.stop(t + 0.042);
   }
 
-  /**
-   * 3. TIMER COMPLETE (Wrap-Up Chime)
-   * Soft harmonic triad (C5, E5, G5) that signals session conclusion without alarming users.
-   */
+  /** 3. TIMER COMPLETE */
   playTimerComplete() {
     this._triggerHaptic([60, 40, 80]);
     if (this.isMuted) return;
-
     const ctx = this._getAudioContext();
     if (!ctx) return;
 
     const t = ctx.currentTime;
-    // C5 (523.25Hz), E5 (659.25Hz), G5 (783.99Hz)
-    const notes = [523.25, 659.25, 783.99];
-
-    notes.forEach((freq, idx) => {
+    [523.25, 659.25, 783.99].forEach((freq, idx) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       const delay = idx * 0.08;
-
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, t + delay);
-
       gain.gain.setValueAtTime(0.0001, t + delay);
-      gain.gain.exponentialRampToValueAtTime(0.25, t + delay + 0.04);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + delay + 1.4);
-
+      gain.gain.exponentialRampToValueAtTime(0.24, t + delay + 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + delay + 1.3);
       osc.connect(gain);
       gain.connect(this.masterGain);
-
-      if (this.reverbConvolver) {
-        gain.connect(this.reverbConvolver);
-      }
-
+      if (this.reverbConvolver) gain.connect(this.reverbConvolver);
       osc.start(t + delay);
-      osc.stop(t + delay + 1.5);
+      osc.stop(t + delay + 1.35);
     });
   }
 
-  /**
-   * 4. MUTUAL MATCH (Ascending Double-Blind Handshake)
-   * Rich, uplifting ascending arpeggio when both users mutually tap "Connect".
-   */
+  /** 4. MUTUAL MATCH */
   playMutualMatch() {
-    this._triggerHaptic([50, 50, 50, 50, 100]);
+    this._triggerHaptic([50, 40, 50, 40, 110]);
     if (this.isMuted) return;
-
     const ctx = this._getAudioContext();
     if (!ctx) return;
 
     const t = ctx.currentTime;
-    // Ascending Pentatonic: G4 (392.00), B4 (493.88), D5 (587.33), E5 (659.25), G5 (783.99)
-    const arpeggio = [392.00, 493.88, 587.33, 659.25, 783.99];
-
-    arpeggio.forEach((freq, index) => {
+    [392.00, 493.88, 587.33, 659.25, 783.99, 1046.50].forEach((freq, index) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      const startTime = t + (index * 0.065);
-
+      const startTime = t + index * 0.06;
       osc.type = 'sine';
       osc.frequency.setValueAtTime(freq, startTime);
-
-      // Add a touch of FM vibrato for warmth on top notes
-      if (index >= 3) {
-        const lfo = ctx.createOscillator();
-        const lfoGain = ctx.createGain();
-        lfo.frequency.setValueAtTime(6.0, startTime);
-        lfoGain.gain.setValueAtTime(4.0, startTime);
-        lfo.connect(osc.frequency);
-        lfo.start(startTime);
-        lfo.stop(startTime + 1.2);
-      }
-
       gain.gain.setValueAtTime(0.0001, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.3, startTime + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.9);
-
+      gain.gain.exponentialRampToValueAtTime(0.26, startTime + 0.025);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + 0.85);
       osc.connect(gain);
       gain.connect(this.masterGain);
-
-      if (this.reverbConvolver) {
-        gain.connect(this.reverbConvolver);
-      }
-
+      if (this.reverbConvolver) gain.connect(this.reverbConvolver);
       osc.start(startTime);
-      osc.stop(startTime + 1.0);
+      osc.stop(startTime + 0.9);
     });
   }
 
-  /**
-   * 5. REFLECTION SAVED (Mechanical Glass/Typewriter Ping)
-   * Crisp, satisfying high-frequency tactile bell when a box reflection is logged.
-   */
+  /** 5. REFLECTION & INSIGHT CONSTELLATION NODE LINK */
   playReflectionSaved() {
-    this._triggerHaptic(40);
+    this._triggerHaptic([35, 30, 65]);
     if (this.isMuted) return;
-
     const ctx = this._getAudioContext();
     if (!ctx) return;
 
     const t = ctx.currentTime;
-
-    // High metal chime fundamental + dissonant harmonic
-    const fundamental = ctx.createOscillator();
-    const overtone = ctx.createOscillator();
-    const gain = ctx.createGain();
-
-    fundamental.type = 'sine';
-    fundamental.frequency.setValueAtTime(2093.00, t); // C7
-
-    overtone.type = 'sine';
-    overtone.frequency.setValueAtTime(4186.01, t); // C8
-
-    gain.gain.setValueAtTime(0.22, t);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.65);
-
-    fundamental.connect(gain);
-    overtone.connect(gain);
-    gain.connect(this.masterGain);
-
-    if (this.reverbConvolver) {
-      gain.connect(this.reverbConvolver);
-    }
-
-    fundamental.start(t);
-    overtone.start(t);
-    fundamental.stop(t + 0.7);
-    overtone.stop(t + 0.7);
+    [587.33, 880.00, 1174.66].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const start = t + i * 0.055;
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.2, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.7);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      if (this.reverbConvolver) gain.connect(this.reverbConvolver);
+      osc.start(start);
+      osc.stop(start + 0.75);
+    });
   }
 
-  /**
-   * 6. LEVEL UP (The Climb Milestone Crescendo)
-   * Punchy, cinematic chord burst celebrating rank progression and badges.
-   */
-  playLevelUp() {
-    this._triggerHaptic([80, 60, 120, 80, 200]);
+  /** 6. COMMUNITY HUB CHECK-IN / FIELD CREDIT CHIME */
+  playSpotHarvest() {
+    this._triggerHaptic([40, 30, 70]);
     if (this.isMuted) return;
-
     const ctx = this._getAudioContext();
     if (!ctx) return;
 
     const t = ctx.currentTime;
+    [659.25, 880.00, 1318.51].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const start = t + i * 0.05;
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(freq, start);
+      gain.gain.setValueAtTime(0.0001, start);
+      gain.gain.exponentialRampToValueAtTime(0.22, start + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.55);
+      osc.connect(gain);
+      gain.connect(this.masterGain);
+      if (this.reverbConvolver) gain.connect(this.reverbConvolver);
+      osc.start(start);
+      osc.stop(start + 0.6);
+    });
+  }
 
-    // Bass root + power fifth + brass-style swell
-    const chord = [130.81, 196.00, 261.63, 329.63, 392.00, 523.25]; // C3, G3, C4, E4, G4, C5
+  playSpotCheckIn() {
+    return this.playSpotHarvest();
+  }
 
+  /** 7. LEVEL UP & SPATIAL ACHIEVEMENT FANFARE */
+  playLevelUp() {
+    this._triggerHaptic([70, 50, 100, 60, 180]);
+    if (this.isMuted) return;
+    const ctx = this._getAudioContext();
+    if (!ctx) return;
+
+    const t = ctx.currentTime;
+    const chord = [261.63, 329.63, 392.00, 523.25, 659.25, 783.99];
     chord.forEach((freq, i) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
-      const stagger = i * 0.04;
-
-      osc.type = i < 2 ? 'sawtooth' : 'triangle';
+      const stagger = i * 0.045;
+      osc.type = i < 2 ? 'triangle' : 'sine';
       osc.frequency.setValueAtTime(freq, t + stagger);
-
-      // Low pass sweep to give a cinematic filter opening effect
-      const filter = ctx.createBiquadFilter();
-      filter.type = 'lowpass';
-      filter.frequency.setValueAtTime(200, t + stagger);
-      filter.frequency.exponentialRampToValueAtTime(3500, t + stagger + 0.3);
-
       gain.gain.setValueAtTime(0.0001, t + stagger);
-      gain.gain.exponentialRampToValueAtTime(0.25 / (chord.length * 0.5), t + stagger + 0.1);
-      gain.gain.exponentialRampToValueAtTime(0.0001, t + stagger + 1.8);
-
-      osc.connect(filter);
-      filter.connect(gain);
+      gain.gain.exponentialRampToValueAtTime(0.18, t + stagger + 0.06);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + stagger + 1.5);
+      osc.connect(gain);
       gain.connect(this.masterGain);
-
-      if (this.reverbConvolver) {
-        gain.connect(this.reverbConvolver);
-      }
-
+      if (this.reverbConvolver) gain.connect(this.reverbConvolver);
       osc.start(t + stagger);
-      osc.stop(t + stagger + 2.0);
+      osc.stop(t + stagger + 1.6);
     });
   }
 }
 
-// Export singleton instance globally to window for instant script inclusion
 window.RadiaAudio = new AudioManager();

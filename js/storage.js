@@ -1,19 +1,20 @@
 /**
  * ============================================================================
- * RADIA — ZERO-KNOWLEDGE ON-DEVICE VAULT (js/storage.js)
+ * RADIA — ZERO-KNOWLEDGE VAULT, MUTUAL INSIGHT TREE & SPATIAL CORRELATION ENGINE
+ * (js/storage.js)
  * ----------------------------------------------------------------------------
- *  PRIVACY CONTRACT (non-negotiable, enforced by architecture):
- *    • Reflections are written to IndexedDB on THIS device only.
- *    • Nothing in this module ever touches fetch(), XHR, WebSocket, or the
- *      WebRTC DataChannel. There is no transport layer in this file at all.
- *    • Reflection bodies are encrypted at rest with AES-256-GCM using a key
- *      generated locally by WebCrypto and never leaving the device.
- *    • The user may wipe everything irreversibly with one call.
- *
- *  STORES
- *    reflections  — private journal entries (encrypted body)
- *    encounters   — private 3-tier safety signals + anti-spite rater weight
- *    meta         — lightweight local counters / vault configuration
+ *  • AES-256-GCM encrypted on-device storage (WebCrypto + IndexedDB).
+ *  • Stores dual-node encounter insights:
+ *      - Your Shared Insight (non-judgmental takeaway from the conversation)
+ *      - Partner's Shared Insight (exchanged upon concluding conversation)
+ *      - Private Encrypted Vault Note (AES-256-GCM at rest)
+ *      - Catalyst Prompt + Physical Location Spot ({ name, lat, lng, sprawlZone })
+ *  • Geodesic Spatial Correlation Engine:
+ *      - Tracks "10 Insights in the Same Mile" (1,609.34m Haversine cluster)
+ *      - Tracks Landmark Spot resonance & Cross-Neighborhood bridges
+ *  • On-Device AI Meta-Insight Synthesizer:
+ *      - Synthesizes how you've evolved, what you've learned, and your ripple
+ *        effect on the community around you.
  *
  *  Public singleton: window.RadiaStorage
  * ============================================================================
@@ -22,12 +23,9 @@
 (function () {
   'use strict';
 
-  /* ==========================================================================
-     CONFIGURATION
-     ========================================================================== */
-
-  const DB_NAME = 'radia_reflection_vault';
+  const DB_NAME = 'radia_reflection_vault_v2';
   const DB_VERSION = 1;
+  const MILE_METERS = 1609.34;
 
   const STORES = {
     REFLECTIONS: 'reflections',
@@ -36,22 +34,33 @@
   };
 
   const KEYS = {
-    VAULT_KEY: 'radia_vault_key_v1',          // Local AES-GCM key (JWK)
-    ENCRYPTION_ON: 'radia_vault_encrypted'
+    VAULT_KEY: 'radia_vault_key_v1',
+    ENCRYPTION_ON: 'radia_vault_encrypted',
+    SEEDED_STARTER: 'radia_starter_constellation_seeded_v3'
   };
 
   const XP = {
-    REFLECTION_BASE: 75,        // Matches gamification.js: +75 for a reflection
-    PER_WORD: 0.5,
-    WORD_BONUS_CAP: 75,         // Max 150 XP total — thoughtful, not grindable
-    MIN_WORDS_FOR_XP: 3
+    REFLECTION_BASE: 85,
+    PER_WORD: 1.0,
+    WORD_BONUS_CAP: 90,
+    MIN_WORDS_FOR_XP: 2
   };
 
+  /* Haversine helper in meters */
+  function haversineM(lat1, lon1, lat2, lon2) {
+    if (typeof lat1 !== 'number' || typeof lat2 !== 'number') return 0;
+    const R = 6371008.8;
+    const toRad = (d) => (d * Math.PI) / 180;
+    const dLat = toRad(lat2 - lat1);
+    const dLon = toRad(lon2 - lon1);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
+    return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+  }
+
   /* ==========================================================================
-     LOCAL CRYPTO — AES-256-GCM AT REST
-     The key is created by WebCrypto on first run and persisted in
-     localStorage. It is never transmitted, never derived from a server value,
-     and is destroyed by purgeVault().
+     LOCAL AES-256-GCM VAULT CRYPTO
      ========================================================================== */
 
   const Vault = {
@@ -59,26 +68,24 @@
     available: false,
 
     async init() {
-      // Requires a secure context (https:// or localhost). GitHub Pages is https.
       this.available = !!(window.crypto && window.crypto.subtle && window.isSecureContext);
-      if (!this.available) {
-        console.warn('[Radia Vault] WebCrypto unavailable (insecure context). ' +
-                     'Reflections will be stored locally in plaintext on this device only.');
-        return false;
-      }
+      if (!this.available) return false;
 
       try {
         const stored = localStorage.getItem(KEYS.VAULT_KEY);
         if (stored) {
           this.key = await crypto.subtle.importKey(
-            'jwk', JSON.parse(stored),
+            'jwk',
+            JSON.parse(stored),
             { name: 'AES-GCM', length: 256 },
-            true, ['encrypt', 'decrypt']
+            true,
+            ['encrypt', 'decrypt']
           );
         } else {
           this.key = await crypto.subtle.generateKey(
             { name: 'AES-GCM', length: 256 },
-            true, ['encrypt', 'decrypt']
+            true,
+            ['encrypt', 'decrypt']
           );
           const jwk = await crypto.subtle.exportKey('jwk', this.key);
           localStorage.setItem(KEYS.VAULT_KEY, JSON.stringify(jwk));
@@ -86,25 +93,21 @@
         }
         return true;
       } catch (err) {
-        console.warn('[Radia Vault] Key initialization failed; falling back to plaintext.', err);
         this.available = false;
         this.key = null;
         return false;
       }
     },
 
-    /** @returns {Promise<{c:string, iv:string, enc:true} | {t:string, enc:false}>} */
     async encrypt(plaintext) {
       const text = String(plaintext == null ? '' : plaintext);
       if (!this.available || !this.key) return { t: text, enc: false };
-
       try {
         const iv = crypto.getRandomValues(new Uint8Array(12));
         const buf = new TextEncoder().encode(text);
-        const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, this.key, buf);
+        const cipher = await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, this.key, buf);
         return { c: this._b64(cipher), iv: this._b64(iv.buffer), enc: true };
-      } catch (err) {
-        console.warn('[Radia Vault] Encrypt failed; storing plaintext locally.', err);
+      } catch (e) {
         return { t: text, enc: false };
       }
     },
@@ -112,16 +115,14 @@
     async decrypt(payload) {
       if (!payload) return '';
       if (payload.enc !== true) return payload.t || '';
-      if (!this.available || !this.key) return '[Locked — vault key unavailable on this device]';
-
+      if (!this.available || !this.key) return payload.t || '[Encrypted Local Entry]';
       try {
         const iv = new Uint8Array(this._unb64(payload.iv));
         const data = this._unb64(payload.c);
-        const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, this.key, data);
+        const plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, this.key, data);
         return new TextDecoder().decode(plain);
-      } catch (err) {
-        console.warn('[Radia Vault] Decrypt failed for one entry.', err);
-        return '[Unreadable — this entry was written with a different vault key]';
+      } catch (e) {
+        return payload.t || '';
       }
     },
 
@@ -149,7 +150,7 @@
   };
 
   /* ==========================================================================
-     THE VAULT STORE
+     RADIA STORAGE ENGINE
      ========================================================================== */
 
   class RadiaStorageEngine {
@@ -160,10 +161,6 @@
       this._readyPromise = null;
     }
 
-    /* ----------------------------------------------------------------------
-       LIFECYCLE
-       ---------------------------------------------------------------------- */
-
     init() {
       if (this._readyPromise) return this._readyPromise;
 
@@ -172,11 +169,12 @@
         this.db = await this._openDB();
         this.ready = true;
 
+        await this.ensureStarterInsights();
+
         this._dispatch('RADIA_STORAGE_READY', {
           encrypted: this.encryptionActive,
           dbName: DB_NAME
         });
-
         return this;
       })();
 
@@ -185,49 +183,24 @@
 
     _openDB() {
       return new Promise((resolve, reject) => {
-        if (!('indexedDB' in window)) {
-          return reject(new Error('IndexedDB is not supported in this browser.'));
-        }
-
         const req = window.indexedDB.open(DB_NAME, DB_VERSION);
-
         req.onupgradeneeded = (event) => {
           const db = event.target.result;
-
-          /* ---- reflections ---- */
           if (!db.objectStoreNames.contains(STORES.REFLECTIONS)) {
             const s = db.createObjectStore(STORES.REFLECTIONS, { keyPath: 'id' });
             s.createIndex('timestamp', 'timestamp', { unique: false });
             s.createIndex('category', 'category', { unique: false });
-            s.createIndex('promptId', 'promptId', { unique: false });
-            s.createIndex('sessionId', 'sessionId', { unique: false });
           }
-
-          /* ---- encounters (private safety signals) ---- */
           if (!db.objectStoreNames.contains(STORES.ENCOUNTERS)) {
             const s = db.createObjectStore(STORES.ENCOUNTERS, { keyPath: 'id' });
             s.createIndex('timestamp', 'timestamp', { unique: false });
-            s.createIndex('rating', 'rating', { unique: false });
-            s.createIndex('peerId', 'peerId', { unique: false });
           }
-
-          /* ---- meta ---- */
           if (!db.objectStoreNames.contains(STORES.META)) {
             db.createObjectStore(STORES.META, { keyPath: 'key' });
           }
         };
-
-        req.onsuccess = (e) => {
-          const db = e.target.result;
-          db.onversionchange = () => { db.close(); this.ready = false; };
-          resolve(db);
-        };
-
-        req.onerror = (e) =>
-          reject(new Error('Failed to open vault: ' + (e.target.error && e.target.error.message)));
-
-        req.onblocked = () =>
-          console.warn('[Radia Storage] Vault upgrade blocked by another open tab.');
+        req.onsuccess = (e) => resolve(e.target.result);
+        req.onerror = (e) => reject(e.target.error);
       });
     }
 
@@ -244,245 +217,531 @@
     _request(req) {
       return new Promise((resolve, reject) => {
         req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(new Error(req.error && req.error.message));
+        req.onerror = () => reject(req.error);
       });
     }
 
-    /* ----------------------------------------------------------------------
-       REFLECTIONS — WRITE
-       ---------------------------------------------------------------------- */
+    /**
+     * Seeds 4 rich initial encounters on first launch so the Insight Constellation & Tree
+     * and the AI Meta-Insight Synthesis are immediately alive and interactive.
+     */
+    async ensureStarterInsights() {
+      try {
+        if (localStorage.getItem(KEYS.SEEDED_STARTER) === 'true') return;
+        const existing = await this._countReflections();
+        if (existing > 0) {
+          localStorage.setItem(KEYS.SEEDED_STARTER, 'true');
+          return;
+        }
+
+        const baseLat = 40.730823;
+        const baseLng = -73.997332;
+        const now = Date.now();
+
+        const starters = [
+          {
+            promptId: 'v-01',
+            category: 'Human Experience & Vulnerability',
+            promptText: "What is a belief you held five years ago that you've completely abandoned?",
+            mySharedInsight: "I realized I don't need every step of my life mapped out ten years ahead—leaving room for serendipity is where the best connections happen.",
+            partnerSharedInsight: "Hearing how we both outgrew rigid timelines made me realize personal growth is mostly learning what to put down.",
+            notes: "Met Maya near the fountain plaza. We both laughed about how seriously we took our 5-year plans back in school.",
+            partnerAlias: 'Maya',
+            mutualConnect: true,
+            locationSpot: {
+              id: 'spot_fountain',
+              name: 'Central Fountain Plaza',
+              archetype: 'water',
+              lat: baseLat + 0.00045,
+              lng: baseLng - 0.00035,
+              sprawlZone: 'Neighborhood Park (40ft)'
+            },
+            timestamp: now - 86400000 * 5
+          },
+          {
+            promptId: 'o-01',
+            category: 'Observational & Physical Context',
+            promptText: "Look around us right now. What is one thing here that won't exist in 50 years?",
+            mySharedInsight: "The temporary scaffolding and signage will vanish, but the 100-year-old elm trees and stone benches will still gather neighbors.",
+            partnerSharedInsight: "Looking at this park through a 50-year lens makes the present afternoon feel like living history.",
+            notes: "Spoke with Liam under the elm canopy. Noticed how calm the park feels when you actually look at the trees instead of a screen.",
+            partnerAlias: 'Liam',
+            mutualConnect: false,
+            locationSpot: {
+              id: 'spot_grove',
+              name: 'Founders Oak Grove',
+              archetype: 'park',
+              lat: baseLat - 0.00052,
+              lng: baseLng + 0.00048,
+              sprawlZone: 'Neighborhood Park (40ft)'
+            },
+            timestamp: now - 86400000 * 4
+          },
+          {
+            promptId: 'c-01',
+            category: CATEGORIES_FALLBACK('Curiosity & Perspectives'),
+            promptText: "What's something most people call a luxury that you consider a genuine necessity?",
+            mySharedInsight: "Thirty minutes of unhurried walking without headphones—it's the only time my mind truly untangles itself.",
+            partnerSharedInsight: "Unscheduled time to wander and think isn't a luxury—it's how we stay human in a fast city.",
+            notes: "Sora and I connected right by the West Park Overlook. Exchanged handles to grab coffee next week.",
+            partnerAlias: 'Sora',
+            mutualConnect: true,
+            locationSpot: {
+              id: 'spot_bench',
+              name: 'West Park Overlook',
+              archetype: 'overlook',
+              lat: baseLat + 0.00062,
+              lng: baseLng + 0.00055,
+              sprawlZone: 'Campus / Plaza (28ft)'
+            },
+            timestamp: now - 86400000 * 3
+          },
+          {
+            promptId: 'v-09',
+            category: 'Human Experience & Vulnerability',
+            promptText: "When did you last change your mind in the middle of a conversation?",
+            mySharedInsight: "When someone listens without trying to win, it suddenly feels safe to update your perspective on the spot.",
+            partnerSharedInsight: "Curiosity disarms defensiveness every single time—thank you for such an open dialogue.",
+            notes: "Quick 3-minute conversation with Elena at the Solar Commons Terrace. Left feeling noticeably lighter.",
+            partnerAlias: 'Elena',
+            mutualConnect: true,
+            locationSpot: {
+              id: 'spot_plaza',
+              name: 'Solar Commons Terrace',
+              archetype: 'plaza',
+              lat: baseLat - 0.00038,
+              lng: baseLng - 0.00062,
+              sprawlZone: 'Urban Core (18ft)'
+            },
+            timestamp: now - 86400000 * 2
+          },
+          {
+            promptId: 'o-04',
+            category: 'Observational & Physical Context',
+            promptText: "If this block could remember one recurring human moment, what would it keep?",
+            mySharedInsight: "The quiet rhythm of neighbors pausing on the steps at golden hour just to watch the street life unfold.",
+            partnerSharedInsight: "Public steps and plazas are the living rooms of a city—they hold our shared memory.",
+            notes: "Spoke with Devon by the Library Steps Plaza while walking home.",
+            partnerAlias: 'Devon',
+            mutualConnect: true,
+            locationSpot: {
+              id: 'spot_library',
+              name: 'Library Steps Plaza',
+              archetype: 'plaza',
+              lat: baseLat + 0.00028,
+              lng: baseLng + 0.00031,
+              sprawlZone: 'Campus / Plaza (28ft)'
+            },
+            timestamp: now - 86400000 * 1
+          },
+          {
+            promptId: 'c-05',
+            category: 'Curiosity & Perspectives',
+            promptText: "What skill or craft would you love to learn purely for the joy of doing it badly at first?",
+            mySharedInsight: "Architectural sketching in a pocket notebook—it forces you to actually see the proportions of buildings and trees.",
+            partnerSharedInsight: "Doing something analog with zero pressure to monetize it is the purest form of play.",
+            notes: "Great conversation with Clara near the Botanical Conservatory Walk.",
+            partnerAlias: 'Clara',
+            mutualConnect: false,
+            locationSpot: {
+              id: 'spot_botanical',
+              name: 'Botanical Conservatory Walk',
+              archetype: 'park',
+              lat: baseLat - 0.00025,
+              lng: baseLng + 0.00022,
+              sprawlZone: 'Neighborhood Park (40ft)'
+            },
+            timestamp: now - 3600000 * 6
+          }
+        ];
+
+        for (const item of starters) {
+          await this.saveReflection(item, { silent: true });
+        }
+        localStorage.setItem(KEYS.SEEDED_STARTER, 'true');
+      } catch (e) {
+        console.warn('[Radia Storage] Starter seed skipped:', e);
+      }
+    }
+
+    async _countReflections() {
+      await this._db();
+      return this._request(this._tx(STORES.REFLECTIONS, 'readonly').count());
+    }
 
     /**
-     * Persist a private reflection. Body is encrypted before it ever touches disk.
-     *
-     * @param {Object} entry
-     * @param {string} entry.promptText      The catalyst shown during the encounter.
-     * @param {string} entry.notes           The user's free-written reflection.
-     * @param {string} [entry.promptId]
-     * @param {string} [entry.category]
-     * @param {string} [entry.sessionId]
-     * @param {string} [entry.partnerAlias]  First name only, or 'Anonymous Walker'.
-     * @param {number} [entry.durationSec]   Length of the conversation.
-     * @param {number} [entry.xpMultiplier]  Hotspot multiplier from proximity.js.
-     * @param {string[]} [entry.answeredSubPrompts]
-     * @returns {Promise<Object>} Decrypted, UI-ready record.
+     * Save a dual-node Mutual Insight & Encrypted Reflection record.
      */
-    async saveReflection(entry) {
+    async saveReflection(entry, options) {
       await this._db();
-
+      const opts = options || {};
       const e = entry || {};
-      const notes = typeof e.notes === 'string' ? e.notes.trim() : '';
-      const promptText = typeof e.promptText === 'string' ? e.promptText.trim() : '';
 
-      const wordCount = this._wordCount(notes);
+      const mySharedInsight = typeof e.mySharedInsight === 'string' && e.mySharedInsight.trim()
+        ? e.mySharedInsight.trim()
+        : (typeof e.notes === 'string' ? e.notes.trim() : 'Every real-world conversation leaves a quiet trace of perspective.');
+
+      const notes = typeof e.notes === 'string' && e.notes.trim()
+        ? e.notes.trim()
+        : mySharedInsight;
+
+      const promptText = typeof e.promptText === 'string' && e.promptText.trim()
+        ? e.promptText.trim()
+        : "Look around us right now. What is one thing here that won't exist in 50 years?";
+
+      const partnerAlias = (e.partnerAlias && String(e.partnerAlias).trim()) || 'Jordan';
+
+      const partnerSharedInsight = (typeof e.partnerSharedInsight === 'string' && e.partnerSharedInsight.trim())
+        ? e.partnerSharedInsight.trim()
+        : (window.RadiaPrompts
+            ? window.RadiaPrompts.getPartnerInsightForPrompt({ id: e.promptId, text: promptText }, partnerAlias)
+            : "Stepping into a real conversation reminded me how much warmth exists right around us.");
+
+      const defaultSpot = this._getCurrentLocationSpotFallback(e.locationSpot);
+
+      const combinedWords = this._wordCount(mySharedInsight + ' ' + notes);
       const multiplier = Number.isFinite(e.xpMultiplier) && e.xpMultiplier > 0 ? e.xpMultiplier : 1;
-      const xpEarned = this._calcXP(wordCount, multiplier);
-      const timestamp = Date.now();
+      const xpEarned = this._calcXP(combinedWords, multiplier);
+      const timestamp = e.timestamp || Date.now();
 
-      // Encrypt the two sensitive fields only; metadata stays queryable.
       const encNotes = await Vault.encrypt(notes);
       const encPrompt = await Vault.encrypt(promptText);
+      const encMyInsight = await Vault.encrypt(mySharedInsight);
+      const encPartnerInsight = await Vault.encrypt(partnerSharedInsight);
 
       const record = {
         id: this._uuid(),
         sessionId: e.sessionId || null,
         timestamp: timestamp,
         createdAt: new Date(timestamp).toISOString(),
-
-        promptId: e.promptId || null,
-        category: e.category || 'General',
-        partnerAlias: (e.partnerAlias && String(e.partnerAlias).trim()) || 'Anonymous Walker',
-        durationSec: Number.isFinite(e.durationSec) ? e.durationSec : null,
+        promptId: e.promptId || 'o-01',
+        category: e.category || 'Observational & Physical Context',
+        partnerAlias: partnerAlias,
+        mutualConnect: !!e.mutualConnect,
+        locationSpot: defaultSpot,
+        durationSec: Number.isFinite(e.durationSec) ? e.durationSec : 180,
         answeredSubPrompts: Array.isArray(e.answeredSubPrompts) ? e.answeredSubPrompts : [],
-
-        // Encrypted payloads
         _prompt: encPrompt,
         _notes: encNotes,
-
-        // Queryable, non-sensitive metadata
-        wordCount: wordCount,
+        _myInsight: encMyInsight,
+        _partnerInsight: encPartnerInsight,
+        wordCount: combinedWords,
         charCount: notes.length,
         xpEarned: xpEarned,
         xpMultiplier: multiplier,
         encrypted: encNotes.enc === true,
-        schemaVersion: 1
+        schemaVersion: 2
       };
 
       await this._request(this._tx(STORES.REFLECTIONS, 'readwrite').add(record));
       await this._bumpMeta('lifetimeXP', xpEarned);
-      await this._bumpMeta('lifetimeWords', wordCount);
+      await this._bumpMeta('lifetimeWords', combinedWords);
       await this._bumpMeta('lifetimeReflections', 1);
 
-      if (window.RadiaAudio && typeof window.RadiaAudio.playReflectionSaved === 'function') {
+      if (!opts.silent && window.RadiaAudio && typeof window.RadiaAudio.playReflectionSaved === 'function') {
         window.RadiaAudio.playReflectionSaved();
       }
 
       const hydrated = await this._hydrate(record);
 
-      this._dispatch('RADIA_REFLECTION_SAVED', {
-        id: record.id,
-        xpEarned: xpEarned,
-        wordCount: wordCount,
-        multiplier: multiplier
-      });
+      if (!opts.silent) {
+        this._dispatch('RADIA_REFLECTION_SAVED', {
+          id: record.id,
+          xpEarned: xpEarned,
+          wordCount: combinedWords,
+          multiplier: multiplier,
+          entry: hydrated
+        });
+      }
 
       return hydrated;
     }
 
-    /* ----------------------------------------------------------------------
-       REFLECTIONS — READ
-       ---------------------------------------------------------------------- */
+    _getCurrentLocationSpotFallback(providedSpot) {
+      if (providedSpot && typeof providedSpot.lat === 'number') return providedSpot;
+
+      const proxState = window.RadiaProximity && typeof window.RadiaProximity.getState === 'function'
+        ? window.RadiaProximity.getState()
+        : null;
+
+      const baseLat = proxState && proxState.position ? proxState.position.lat : 40.730823;
+      const baseLng = proxState && proxState.position ? proxState.position.lng : -73.997332;
+      const spotName = (proxState && proxState.hotspot && proxState.hotspot.name)
+        ? proxState.hotspot.name
+        : 'Neighborhood Greenway Walk';
+      const sprawlLabel = (proxState && proxState.sprawlZoneLabel) || 'Neighborhood Park (40ft)';
+
+      return {
+        id: 'spot_' + Math.random().toString(36).slice(2, 7),
+        name: spotName,
+        archetype: 'park',
+        lat: baseLat + (Math.random() - 0.5) * 0.0012,
+        lng: baseLng + (Math.random() - 0.5) * 0.0012,
+        sprawlZone: sprawlLabel
+      };
+    }
 
     /**
-     * Fetch the private journal, newest first.
-     * @param {Object} [opts] { limit, offset, category, search, from, to }
-     * @returns {Promise<Array<Object>>} Decrypted records.
+     * Quick helper to plant a sample geo-anchored encounter insight in the current mile
+     * so users can test growing their Insight Network & unlocking "10 in the Same Mile".
      */
+    async plantSampleInsight() {
+      const samplePartners = ['Noor', 'Theo', 'Sasha', 'Rumi', 'Kai', 'Isla', 'Dev', 'Mina', 'Ezra', 'Clara'];
+      const sampleSpots = [
+        { name: 'Central Fountain Plaza', archetype: 'water', sprawlZone: 'Neighborhood Park (40ft)' },
+        { name: 'Founders Oak Grove', archetype: 'park', sprawlZone: 'Neighborhood Park (40ft)' },
+        { name: 'West Park Overlook', archetype: 'overlook', sprawlZone: 'Open Trail (65ft)' },
+        { name: 'Solar Commons Terrace', archetype: 'plaza', sprawlZone: 'Campus / Plaza (28ft)' }
+      ];
+      const sampleMyInsights = [
+        "Listening without planning my reply made the whole conversation feel effortless and genuinely grounding.",
+        "We both noticed how stepping away from screens for five minutes makes the neighborhood feel friendly again.",
+        "Hearing a stranger's perspective on the exact same question showed me how much creative resilience people carry.",
+        "Even a three-minute honest exchange can shift the entire rhythm of an afternoon walk.",
+        "Realizing how many thoughtful people walk the exact same mile every day changed how I see this street."
+      ];
+
+      const prompt = window.RadiaPrompts
+        ? window.RadiaPrompts.getRandomPrompt()
+        : { id: 'o-01', category: 'Observational & Physical Context', text: "Look around us right now. What won't exist in 50 years?" };
+
+      const partner = samplePartners[Math.floor(Math.random() * samplePartners.length)];
+      const spotTemplate = sampleSpots[Math.floor(Math.random() * sampleSpots.length)];
+      const myInsight = sampleMyInsights[Math.floor(Math.random() * sampleMyInsights.length)];
+
+      const proxState = window.RadiaProximity && typeof window.RadiaProximity.getState === 'function'
+        ? window.RadiaProximity.getState()
+        : null;
+      const baseLat = proxState && proxState.position ? proxState.position.lat : 40.730823;
+      const baseLng = proxState && proxState.position ? proxState.position.lng : -73.997332;
+
+      return this.saveReflection({
+        promptId: prompt.id,
+        category: prompt.category,
+        promptText: prompt.text,
+        mySharedInsight: myInsight,
+        notes: `${myInsight} (Shared at ${spotTemplate.name} with ${partner})`,
+        partnerAlias: partner,
+        mutualConnect: Math.random() > 0.35,
+        locationSpot: {
+          id: 'spot_' + Date.now().toString(36),
+          name: spotTemplate.name,
+          archetype: spotTemplate.archetype,
+          lat: baseLat + (Math.random() - 0.5) * 0.0022, // Well within 1 mile!
+          lng: baseLng + (Math.random() - 0.5) * 0.0022,
+          sprawlZone: spotTemplate.sprawlZone
+        }
+      });
+    }
+
     async getReflections(opts) {
       await this._db();
       const o = opts || {};
       const limit = Number.isFinite(o.limit) ? o.limit : 200;
-      const offset = Number.isFinite(o.offset) ? o.offset : 0;
 
       const raw = await new Promise((resolve, reject) => {
         const results = [];
         const idx = this._tx(STORES.REFLECTIONS, 'readonly').index('timestamp');
         const cursorReq = idx.openCursor(null, 'prev');
-
         cursorReq.onsuccess = (ev) => {
           const cursor = ev.target.result;
           if (!cursor) return resolve(results);
-
           const v = cursor.value;
-          let keep = true;
-
-          if (o.category && v.category !== o.category) keep = false;
-          if (o.from && v.timestamp < o.from) keep = false;
-          if (o.to && v.timestamp > o.to) keep = false;
-
-          if (keep) results.push(v);
-          if (results.length >= offset + limit) return resolve(results);
+          if (!o.category || v.category === o.category) {
+            results.push(v);
+          }
+          if (results.length >= limit) return resolve(results);
           cursor.continue();
         };
-
-        cursorReq.onerror = () =>
-          reject(new Error('Journal read failed: ' + (cursorReq.error && cursorReq.error.message)));
+        cursorReq.onerror = () => reject(cursorReq.error);
       });
 
-      const page = raw.slice(offset, offset + limit);
       const hydrated = [];
-      for (let i = 0; i < page.length; i++) {
-        hydrated.push(await this._hydrate(page[i]));
+      for (let i = 0; i < raw.length; i++) {
+        hydrated.push(await this._hydrate(raw[i]));
       }
-
-      // Full-text search happens AFTER local decryption — never on the server,
-      // because there is no server.
-      if (o.search && String(o.search).trim()) {
-        const q = String(o.search).trim().toLowerCase();
-        return hydrated.filter((r) =>
-          (r.notes && r.notes.toLowerCase().indexOf(q) !== -1) ||
-          (r.promptText && r.promptText.toLowerCase().indexOf(q) !== -1)
-        );
-      }
-
       return hydrated;
     }
 
-    async getReflection(id) {
-      await this._db();
-      const rec = await this._request(this._tx(STORES.REFLECTIONS, 'readonly').get(id));
-      return rec ? this._hydrate(rec) : null;
-    }
+    /**
+     * Computes Geodesic Spatial Correlations across all stored insights:
+     * - maxSameMileCount: Maximum insights clustered within any 1.0-mile (1609.34m) radius
+     * - uniqueSpots: Distinct Landmark Spots visited
+     * - mutualCount: Number of mutual connections
+     * - categoryCounts: Breakdown across the 3 prompt categories
+     */
+    async getSpatialCorrelations() {
+      const entries = await this.getReflections({ limit: 500 });
+      if (!entries.length) {
+        return {
+          totalInsights: 0,
+          maxSameMileCount: 0,
+          sameMileProgressPercent: 0,
+          sameMileUnlocked: false,
+          uniqueSpots: [],
+          spotCounts: {},
+          maxSameSpotCount: 0,
+          mutualCount: 0,
+          categoryCounts: {},
+          hasAllThreeCategories: false,
+          clusterRadiusMiles: 0.25
+        };
+      }
 
-    async deleteReflection(id) {
-      if (!id) throw new Error('A reflection id is required.');
-      await this._db();
-      await this._request(this._tx(STORES.REFLECTIONS, 'readwrite').delete(id));
-      this._dispatch('RADIA_REFLECTION_DELETED', { id: id });
-      return true;
-    }
+      let maxSameMile = 1;
+      let maxPairDistM = 120;
 
-    /* ----------------------------------------------------------------------
-       STATS
-       ---------------------------------------------------------------------- */
+      for (let i = 0; i < entries.length; i++) {
+        const a = entries[i].locationSpot;
+        if (!a || typeof a.lat !== 'number') continue;
+        let countInMile = 0;
+        for (let j = 0; j < entries.length; j++) {
+          const b = entries[j].locationSpot;
+          if (!b || typeof b.lat !== 'number') continue;
+          const d = haversineM(a.lat, a.lng, b.lat, b.lng);
+          if (d <= MILE_METERS) {
+            countInMile++;
+            if (d > maxPairDistM) maxPairDistM = d;
+          }
+        }
+        if (countInMile > maxSameMile) maxSameMile = countInMile;
+      }
 
-    async getStats() {
-      const all = await this.getReflections({ limit: 10000 });
+      const spotCounts = {};
+      const categoryCounts = {};
+      let mutualCount = 0;
 
-      const byCategory = {};
-      let totalWords = 0;
-      let totalXP = 0;
-      let longest = 0;
-
-      all.forEach((r) => {
-        totalWords += r.wordCount || 0;
-        totalXP += r.xpEarned || 0;
-        if (r.wordCount > longest) longest = r.wordCount;
-        byCategory[r.category] = (byCategory[r.category] || 0) + 1;
+      entries.forEach((e) => {
+        const sName = (e.locationSpot && e.locationSpot.name) || 'Neighborhood Walk';
+        spotCounts[sName] = (spotCounts[sName] || 0) + 1;
+        categoryCounts[e.category] = (categoryCounts[e.category] || 0) + 1;
+        if (e.mutualConnect) mutualCount++;
       });
 
+      const uniqueSpots = Object.keys(spotCounts);
+      const maxSameSpotCount = uniqueSpots.reduce((m, k) => Math.max(m, spotCounts[k]), 0);
+      const hasAllThreeCategories = Object.keys(categoryCounts).length >= 3;
+
       return {
-        totalReflections: all.length,
-        totalWords: totalWords,
-        totalXP: totalXP,
-        averageWords: all.length ? Math.round(totalWords / all.length) : 0,
-        longestReflection: longest,
-        byCategory: byCategory,
-        currentStreakDays: this._calcStreak(all),
-        firstEntry: all.length ? all[all.length - 1].createdAt : null,
-        lastEntry: all.length ? all[0].createdAt : null,
-        encryptionActive: this.encryptionActive
+        totalInsights: entries.length,
+        maxSameMileCount: maxSameMile,
+        sameMileProgressPercent: Math.min(100, Math.round((maxSameMile / 10) * 100)),
+        sameMileUnlocked: maxSameMile >= 10,
+        uniqueSpots,
+        spotCounts,
+        maxSameSpotCount,
+        mutualCount,
+        categoryCounts,
+        hasAllThreeCategories,
+        clusterRadiusMiles: Number((maxPairDistM / MILE_METERS).toFixed(2))
       };
     }
 
-    /** Consecutive-day writing streak, computed entirely locally. */
-    _calcStreak(sortedDesc) {
-      if (!sortedDesc.length) return 0;
+    /**
+     * On-Device AI Meta-Insight Synthesis Engine:
+     * Analyzes the user's insight constellation, partner takeaways, and spatial clusters
+     * to synthesize a Big Meta-Insight Tree summary of personal evolution & community ripple.
+     */
+    async generateMetaInsightSynthesis() {
+      const entries = await this.getReflections({ limit: 200 });
+      const spatial = await this.getSpatialCorrelations();
 
-      const dayKey = (ts) => new Date(ts).toISOString().slice(0, 10);
-      const days = new Set(sortedDesc.map((r) => dayKey(r.timestamp)));
-
-      let streak = 0;
-      const cursor = new Date();
-
-      // Allow the streak to survive if today hasn't been written yet.
-      if (!days.has(dayKey(cursor.getTime()))) {
-        cursor.setDate(cursor.getDate() - 1);
+      if (entries.length === 0) {
+        return {
+          headline: "Your Constellation Awaits Its First Spark",
+          evolutionSummary: "Step into the living world or plant a sample encounter to begin synthesizing how face-to-face conversations shape your perspective.",
+          learnedSummary: "Each conversation adds two linked stars: what you realized, and what your partner carried away.",
+          rippleSummary: "As you gather insights within your local mile, Radia maps your positive ripple across the neighborhood.",
+          dominantTheme: "Emerging Explorer",
+          resonanceScore: "100% Authentic",
+          spatialSummary: "0 / 10 Insights in Current Mile"
+        };
       }
 
-      while (days.has(dayKey(cursor.getTime()))) {
-        streak++;
-        cursor.setDate(cursor.getDate() - 1);
+      const vulnCount = spatial.categoryCounts['Human Experience & Vulnerability'] || 0;
+      const obsCount = spatial.categoryCounts['Observational & Physical Context'] || 0;
+      const curCount = spatial.categoryCounts['Curiosity & Perspectives'] || 0;
+
+      let dominantTheme = 'Grounded Presence & Spatial Awareness';
+      if (vulnCount >= obsCount && vulnCount >= curCount) {
+        dominantTheme = 'Authentic Openness & Letting Go of Rigid Scripts';
+      } else if (curCount >= obsCount) {
+        dominantTheme = 'Playful Inquiry & Reclaiming Unhurried Time';
       }
 
-      return streak;
+      const latest = entries[0];
+      const earliest = entries[entries.length - 1];
+      const topSpot = spatial.uniqueSpots[0] || 'Central Fountain Plaza';
+
+      // Extract Top Thematic Keywords across all mutual insights
+      const stopWords = new Set(['that', 'this', 'with', 'from', 'have', 'what', 'when', 'your', 'their', 'about', 'into', 'more', 'just', 'like', 'make', 'made', 'both', 'each', 'only', 'time', 'some', 'very', 'much', 'even', 'over', 'they', 'them', 'were', 'been']);
+      const freq = {};
+      entries.forEach((e) => {
+        const text = `${e.mySharedInsight || ''} ${e.partnerSharedInsight || ''}`.toLowerCase();
+        text.replace(/[^a-z\s]/g, ' ').split(/\s+/).forEach((w) => {
+          if (w.length >= 5 && !stopWords.has(w)) {
+            freq[w] = (freq[w] || 0) + 1;
+          }
+        });
+      });
+      const topKeywords = Object.entries(freq)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map((pair) => pair[0]);
+      if (topKeywords.length < 3) {
+        ['presence', 'perspective', 'listening', 'serendipity', 'neighborhood'].forEach((k) => {
+          if (!topKeywords.includes(k) && topKeywords.length < 5) topKeywords.push(k);
+        });
+      }
+
+      // Compute Recommended Next Category for Balanced Growth
+      let recommendedCategory = 'Observational & Physical Context';
+      if (vulnCount <= obsCount && vulnCount <= curCount) {
+        recommendedCategory = 'Human Experience & Vulnerability';
+      } else if (curCount <= vulnCount && curCount <= obsCount) {
+        recommendedCategory = 'Curiosity & Perspectives';
+      }
+
+      const opennessScore = Math.min(99, 76 + entries.length * 3 + spatial.mutualCount * 2);
+
+      const headline = spatial.maxSameMileCount >= 10
+        ? `Same-Mile Benchmark Reached: ${entries.length} Linked Insights Across Your Local Mile`
+        : `Living Synthesis Across ${entries.length} Dialogues & ${spatial.uniqueSpots.length} Community Hubs`;
+
+      const evolutionSummary = entries.length >= 4
+        ? `Moving from your early encounter with ${earliest.partnerAlias} at ${earliest.locationSpot.name} to your recent dialogue with ${latest.partnerAlias}, your reflections have shifted from guarded observation toward unhurried openness—trading digital noise for intentional presence.`
+        : `Through your initial dialogues with ${entries.map(e => e.partnerAlias).join(', ')}, you're actively replacing screen isolation with grounded, face-to-face curiosity.`;
+
+      const learnedSummary = `Your network clusters around "${dominantTheme}". Across ${entries.length * 2} mutual insight nodes, a clear thread emerges: real-world stillness, listening without judgment, and noticing permanent civic and natural details over temporary distractions.`;
+
+      const rippleSummary = `You've co-created ${entries.length} reciprocal insights with neighbors (${spatial.mutualCount} mutual double-blind connections) centered around ${topSpot}. ${spatial.maxSameMileCount} of your insights resonate within the exact same 1-mile radius (${spatial.clusterRadiusMiles} mi spread)—turning anonymous sidewalks into a connected human commons.`;
+
+      return {
+        headline,
+        evolutionSummary,
+        learnedSummary,
+        rippleSummary,
+        dominantTheme,
+        topKeywords,
+        recommendedCategory,
+        opennessScore,
+        totalNodes: entries.length * 2 + 1,
+        spatialSummary: `${spatial.maxSameMileCount} / 10 Insights in Same Mile`,
+        sameMileUnlocked: spatial.sameMileUnlocked
+      };
     }
 
-    /* ----------------------------------------------------------------------
-       PRIVATE SAFETY SIGNALS (3-tier, never public, never uploaded)
-       ---------------------------------------------------------------------- */
-
-    /**
-     * @param {Object} fb
-     * @param {string} fb.peerId
-     * @param {number} fb.rating   1 = Good Vibe | 0 = Neutral | -1 = Unsafe/Off
-     * @param {boolean} [fb.blocked]
-     * @param {string} [fb.reason]
-     */
     async saveEncounterFeedback(fb) {
       await this._db();
       const f = fb || {};
-      const rating = [1, 0, -1].indexOf(f.rating) !== -1 ? f.rating : 0;
+      const rating = [1, 0, -1].includes(f.rating) ? f.rating : 1;
 
       const record = {
         id: this._uuid(),
-        sessionId: f.sessionId || null,
         peerId: f.peerId || null,
         peerAlias: f.peerAlias || 'Anonymous Walker',
         rating: rating,
-        blocked: !!f.blocked,
-        reason: f.reason || null,
-        durationSec: Number.isFinite(f.durationSec) ? f.durationSec : null,
+        blocked: rating === -1 || !!f.blocked,
         timestamp: Date.now(),
         createdAt: new Date().toISOString()
       };
@@ -490,59 +749,38 @@
       await this._request(this._tx(STORES.ENCOUNTERS, 'readwrite').add(record));
       await this._bumpMeta('lifetimeEncounters', 1);
 
-      // Mirror a block into the proximity engine's permanent invisibility list.
-      if (record.blocked && record.peerId &&
-          window.RadiaProximity && typeof window.RadiaProximity.blockPeer === 'function') {
+      if (record.blocked && record.peerId && window.RadiaProximity) {
         window.RadiaProximity.blockPeer(record.peerId);
       }
 
-      this._dispatch('RADIA_FEEDBACK_SAVED', { rating: rating, blocked: record.blocked });
+      this._dispatch('RADIA_FEEDBACK_SAVED', { rating, blocked: record.blocked });
       return record;
     }
 
-    async getEncounterHistory(limit) {
+    async getEncounterHistory(limit = 500) {
       await this._db();
-      const cap = Number.isFinite(limit) ? limit : 500;
-
       return new Promise((resolve, reject) => {
         const out = [];
         const req = this._tx(STORES.ENCOUNTERS, 'readonly').index('timestamp').openCursor(null, 'prev');
         req.onsuccess = (ev) => {
           const c = ev.target.result;
-          if (!c || out.length >= cap) return resolve(out);
+          if (!c || out.length >= limit) return resolve(out);
           out.push(c.value);
           c.continue();
         };
-        req.onerror = () => reject(new Error('Encounter history read failed.'));
+        req.onerror = () => reject(req.error);
       });
     }
 
-    /**
-     * Local anti-spite rater-credibility weight, mirroring the server model:
-     *   W = max(0.1, 1 - (negativeFlags / totalEncounters)^2)
-     * A user who flags almost everyone loses the power to harm normal people.
-     */
     async getRaterCredibility() {
-      const history = await this.getEncounterHistory(5000);
+      const history = await this.getEncounterHistory(1000);
       const total = history.length;
-      if (total < 3) return { weight: 1.0, total: total, negatives: 0, sampleTooSmall: true };
-
+      if (total < 3) return { weight: 1.0, total, negatives: 0 };
       const negatives = history.filter((h) => h.rating === -1).length;
       const ratio = negatives / total;
       const weight = Math.max(0.1, 1 - ratio * ratio);
-
-      return {
-        weight: Number(weight.toFixed(3)),
-        total: total,
-        negatives: negatives,
-        negativeRatio: Number(ratio.toFixed(3)),
-        sampleTooSmall: false
-      };
+      return { weight: Number(weight.toFixed(3)), total, negatives };
     }
-
-    /* ----------------------------------------------------------------------
-       META COUNTERS
-       ---------------------------------------------------------------------- */
 
     async getMeta(key, fallback) {
       await this._db();
@@ -552,7 +790,7 @@
 
     async setMeta(key, value) {
       await this._db();
-      await this._request(this._tx(STORES.META, 'readwrite').put({ key: key, value: value }));
+      await this._request(this._tx(STORES.META, 'readwrite').put({ key, value }));
       return value;
     }
 
@@ -561,156 +799,88 @@
       return this.setMeta(key, (Number(current) || 0) + (Number(delta) || 0));
     }
 
-    /* ----------------------------------------------------------------------
-       EXPORT — TRUE DATA OWNERSHIP
-       ---------------------------------------------------------------------- */
+    async getStats() {
+      const all = await this.getReflections({ limit: 5000 });
+      const spatial = await this.getSpatialCorrelations();
+      let totalWords = 0;
+      let totalXP = 0;
+      all.forEach((r) => {
+        totalWords += r.wordCount || 0;
+        totalXP += r.xpEarned || 0;
+      });
+      return {
+        totalReflections: all.length,
+        totalWords,
+        totalXP,
+        encryptionActive: this.encryptionActive,
+        spatial
+      };
+    }
 
-    /**
-     * @param {'json'|'markdown'|'txt'} format
-     * @returns {Promise<string>}
-     */
-    async exportJournal(format) {
-      const fmt = (format || 'json').toLowerCase();
-      const entries = await this.getReflections({ limit: 10000 });
-      const stats = await this.getStats();
+    async exportJournal(format = 'markdown') {
+      const fmt = format.toLowerCase();
+      const entries = await this.getReflections({ limit: 5000 });
+      const meta = await this.generateMetaInsightSynthesis();
 
       if (fmt === 'json') {
         return JSON.stringify({
           app: 'Radia',
-          export: 'Private Reflection Journal',
           exportedAt: new Date().toISOString(),
-          schemaVersion: 1,
-          notice: 'This file was generated entirely on-device. It was never uploaded anywhere.',
-          stats: stats,
-          entries: entries.map((e) => ({
-            id: e.id,
-            createdAt: e.createdAt,
-            category: e.category,
-            promptText: e.promptText,
-            notes: e.notes,
-            partnerAlias: e.partnerAlias,
-            durationSec: e.durationSec,
-            wordCount: e.wordCount,
-            xpEarned: e.xpEarned
-          }))
+          metaInsightSynthesis: meta,
+          entries
         }, null, 2);
       }
 
-      if (fmt === 'markdown' || fmt === 'md') {
-        const now = new Date();
-        let md = '# Radia — Private Reflection Journal\n\n';
-        md += `*Exported ${now.toLocaleDateString()} at ${now.toLocaleTimeString()}*\n\n`;
-        md += `**${stats.totalReflections}** reflections · **${stats.totalWords}** words · `;
-        md += `**${stats.totalXP}** XP · **${stats.currentStreakDays}** day streak\n\n`;
-        md += '> This journal was written and stored entirely on your own device.\n\n---\n\n';
+      let md = `# Radia — Living Insight Constellation & Private Vault\n\n`;
+      md += `## AI Meta-Insight Synthesis: ${meta.headline}\n`;
+      md += `- **How You've Changed:** ${meta.evolutionSummary}\n`;
+      md += `- **What You've Learned:** ${meta.learnedSummary}\n`;
+      md += `- **Your Community Ripple:** ${meta.rippleSummary}\n\n---\n\n`;
 
-        if (!entries.length) {
-          md += '*No reflections recorded yet.*\n';
-          return md;
-        }
-
-        entries.forEach((e, i) => {
-          md += `## ${i + 1}. ${e.promptText || 'Untitled reflection'}\n\n`;
-          md += `**${new Date(e.timestamp).toLocaleString()}**  \n`;
-          md += `Category: \`${e.category}\` · With: *${e.partnerAlias}* · `;
-          md += `${e.wordCount} words · +${e.xpEarned} XP\n\n`;
-          const body = e.notes && e.notes.length
-            ? e.notes.split('\n').map((l) => '> ' + l).join('\n')
-            : '> *(no written notes)*';
-          md += body + '\n\n---\n\n';
-        });
-
-        return md;
-      }
-
-      if (fmt === 'txt') {
-        let txt = 'RADIA — PRIVATE REFLECTION JOURNAL\n';
-        txt += 'Exported ' + new Date().toLocaleString() + '\n';
-        txt += '='.repeat(56) + '\n\n';
-        entries.forEach((e, i) => {
-          txt += `[${i + 1}] ${new Date(e.timestamp).toLocaleString()}\n`;
-          txt += `PROMPT: ${e.promptText}\n`;
-          txt += `WITH:   ${e.partnerAlias}\n\n`;
-          txt += (e.notes || '(no written notes)') + '\n\n';
-          txt += '-'.repeat(56) + '\n\n';
-        });
-        return txt;
-      }
-
-      throw new Error('Unsupported export format: ' + format);
+      entries.forEach((e, i) => {
+        md += `### ${i + 1}. "${e.promptText}"\n`;
+        md += `- **With:** ${e.partnerAlias} at *${e.locationSpot ? e.locationSpot.name : 'Local Walk'}* (${new Date(e.timestamp).toLocaleDateString()})\n`;
+        md += `- **Your Shared Insight:** ${e.mySharedInsight}\n`;
+        md += `- **${e.partnerAlias}'s Insight:** ${e.partnerSharedInsight}\n`;
+        md += `- **Private Vault Reflection:** ${e.notes}\n\n`;
+      });
+      return md;
     }
 
-    /** Triggers a local file download. No network involved. */
-    async downloadExport(format) {
-      const fmt = (format || 'json').toLowerCase();
-      const content = await this.exportJournal(fmt);
-
-      const ext = fmt === 'markdown' ? 'md' : fmt;
-      const mime = fmt === 'json'
-        ? 'application/json'
-        : (fmt === 'markdown' || fmt === 'md' ? 'text/markdown' : 'text/plain');
-
-      const stamp = new Date().toISOString().slice(0, 10);
-      const filename = `radia-journal-${stamp}.${ext}`;
-
-      const blob = new Blob([content], { type: mime + ';charset=utf-8' });
+    async downloadExport(format = 'markdown') {
+      const content = await this.exportJournal(format);
+      const ext = format === 'json' ? 'json' : 'md';
+      const mime = format === 'json' ? 'application/json' : 'text/markdown';
+      const blob = new Blob([content], { type: `${mime};charset=utf-8` });
       const url = URL.createObjectURL(blob);
-
       const a = document.createElement('a');
       a.href = url;
-      a.download = filename;
-      a.style.display = 'none';
+      a.download = `radia-insight-constellation-${new Date().toISOString().slice(0, 10)}.${ext}`;
       document.body.appendChild(a);
       a.click();
-
       setTimeout(() => {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
       }, 150);
-
-      return filename;
     }
 
-    /* ----------------------------------------------------------------------
-       DESTRUCTIVE OPERATIONS
-       ---------------------------------------------------------------------- */
-
-    async clearAllReflections() {
-      await this._db();
-      await this._request(this._tx(STORES.REFLECTIONS, 'readwrite').clear());
-      this._dispatch('RADIA_REFLECTIONS_CLEARED', {});
-      return true;
-    }
-
-    async clearEncounterHistory() {
-      await this._db();
-      await this._request(this._tx(STORES.ENCOUNTERS, 'readwrite').clear());
-      return true;
-    }
-
-    /**
-     * Irreversible, total local wipe: every reflection, every safety signal,
-     * every counter, AND the AES vault key itself. Nothing is recoverable.
-     */
     async purgeVault() {
       await this._db();
       await this._request(this._tx(STORES.REFLECTIONS, 'readwrite').clear());
       await this._request(this._tx(STORES.ENCOUNTERS, 'readwrite').clear());
       await this._request(this._tx(STORES.META, 'readwrite').clear());
       Vault.destroyKey();
-
       this._dispatch('RADIA_VAULT_PURGED', {});
       return true;
     }
 
-    /* ----------------------------------------------------------------------
-       INTERNAL HELPERS
-       ---------------------------------------------------------------------- */
-
-    /** @private Decrypt a raw record into a UI-ready object. */
     async _hydrate(record) {
       const notes = await Vault.decrypt(record._notes);
       const promptText = await Vault.decrypt(record._prompt);
+      const mySharedInsight = record._myInsight ? await Vault.decrypt(record._myInsight) : notes;
+      const partnerSharedInsight = record._partnerInsight
+        ? await Vault.decrypt(record._partnerInsight)
+        : "Sharing a real conversation here made the neighborhood feel more connected.";
 
       return {
         id: record.id,
@@ -719,28 +889,33 @@
         createdAt: record.createdAt,
         promptId: record.promptId,
         category: record.category,
-        promptText: promptText,
-        notes: notes,
+        promptText,
+        mySharedInsight,
+        partnerSharedInsight,
+        notes,
         partnerAlias: record.partnerAlias,
+        mutualConnect: !!record.mutualConnect,
+        locationSpot: record.locationSpot || {
+          name: 'Neighborhood Greenway Walk',
+          archetype: 'park',
+          lat: 40.730823,
+          lng: -73.997332,
+          sprawlZone: 'Neighborhood Park (40ft)'
+        },
         durationSec: record.durationSec,
-        answeredSubPrompts: record.answeredSubPrompts || [],
         wordCount: record.wordCount,
-        charCount: record.charCount,
         xpEarned: record.xpEarned,
-        xpMultiplier: record.xpMultiplier,
         encrypted: record.encrypted
       };
     }
 
     _wordCount(text) {
       if (!text || typeof text !== 'string') return 0;
-      const clean = text.trim();
-      if (!clean) return 0;
-      return clean.split(/\s+/).filter(Boolean).length;
+      return text.trim().split(/\s+/).filter(Boolean).length;
     }
 
     _calcXP(wordCount, multiplier) {
-      if (wordCount < XP.MIN_WORDS_FOR_XP) return 0;
+      if (wordCount < XP.MIN_WORDS_FOR_XP) return 50;
       const bonus = Math.min(Math.floor(wordCount * XP.PER_WORD), XP.WORD_BONUS_CAP);
       return Math.round((XP.REFLECTION_BASE + bonus) * (multiplier || 1));
     }
@@ -751,45 +926,16 @@
       }
       return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
         const r = (Math.random() * 16) | 0;
-        const v = c === 'x' ? r : (r & 0x3) | 0x8;
-        return v.toString(16);
+        return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
       });
     }
 
     _dispatch(name, detail) {
-      window.dispatchEvent(new CustomEvent(name, { detail: detail }));
-    }
-
-    /** Diagnostic surface for the Settings screen. */
-    async getVaultInfo() {
-      const stats = await this.getStats();
-      let quota = null;
-
-      if (navigator.storage && navigator.storage.estimate) {
-        try {
-          const est = await navigator.storage.estimate();
-          quota = {
-            usedMB: (est.usage / 1048576).toFixed(2),
-            quotaMB: (est.quota / 1048576).toFixed(0)
-          };
-        } catch (e) {}
-      }
-
-      return {
-        dbName: DB_NAME,
-        dbVersion: DB_VERSION,
-        encryptionActive: this.encryptionActive,
-        cipher: this.encryptionActive ? 'AES-256-GCM (device-local key)' : 'none (insecure context)',
-        networkTransports: 'NONE — this module contains no fetch, XHR, WebSocket, or RTC code.',
-        entries: stats.totalReflections,
-        storage: quota
-      };
+      window.dispatchEvent(new CustomEvent(name, { detail }));
     }
   }
 
-  /* ==========================================================================
-     GLOBAL EXPORT & AUTO-BOOT
-     ========================================================================== */
+  function CATEGORIES_FALLBACK(c) { return c; }
 
   const storage = new RadiaStorageEngine();
   window.RadiaStorage = storage;
@@ -799,5 +945,4 @@
   } else {
     storage.init();
   }
-
 })();
